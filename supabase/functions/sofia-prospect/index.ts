@@ -84,7 +84,8 @@ function generateSearchQueries(niche: string, region: string): string[] {
     queries.push(`site:facebook.com ${term} ${region} belgique`);
   }
 
-  return [...new Set(queries)];
+  // Limit total queries to avoid memory issues on edge functions
+  return [...new Set(queries)].slice(0, 12);
 }
 
 // ==================== EXTRACTION ====================
@@ -92,6 +93,35 @@ function generateSearchQueries(niche: string, region: string): string[] {
 // Belgian mobile regex — only 04x numbers (no landlines)
 const MOBILE_REGEX = /(?:\+32|0032|0)\s*4[5-9][\d\s\-\.\/]{6,10}/g;
 const EMAIL_REGEX = /[\w.-]+@[\w.-]+\.\w{2,}/g;
+
+// Domains of directories/platforms — their emails belong to the platform, not the business
+const DIRECTORY_DOMAINS = [
+  'bottin.be', 'pagesdor.be', 'goldenpages.be', 'yelp.com', 'yelp.be',
+  'tripadvisor.com', 'tripadvisor.be', 'google.com', 'facebook.com',
+  'instagram.com', 'linkedin.com', 'twitter.com', 'tiktok.com',
+  'doctoranytime.be', 'doctolib.be', 'doctolib.fr', 'mondocteur.be',
+  'infobel.com', 'cylex.be', 'hotfrog.be', 'kompass.com',
+  'europages.com', 'trustpilot.com', 'glassdoor.com',
+  'immoweb.be', 'immovlan.be', 'zimmo.be',
+  'booking.com', 'hotels.com', 'expedia.com',
+  'fresha.com', 'treatwell.be', 'planity.com', 'salonkee.com',
+  'uber.com', 'deliveroo.com', 'takeaway.com',
+  'wordpress.com', 'wix.com', 'squarespace.com', 'godaddy.com',
+  'sentry.io', 'googleapis.com', 'gstatic.com', 'cloudflare.com',
+];
+
+function isDirectoryEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase() || '';
+  return DIRECTORY_DOMAINS.some(d => domain === d || domain.endsWith('.' + d));
+}
+
+function isJunkEmail(email: string): boolean {
+  if (isDirectoryEmail(email)) return true;
+  if (email.match(/^(noreply|no-reply|mailer-daemon|postmaster|example|test|sampleemail|privacy|dpo|gdpr|cookie|webmaster|abuse)@/i)) return true;
+  if (email.match(/@(example|test|sentry|localhost)\./i)) return true;
+  if (email.endsWith('.png') || email.endsWith('.jpg') || email.endsWith('.svg')) return true;
+  return false;
+}
 
 // Extract JSON-LD structured data from markdown/HTML
 function extractFromJsonLd(markdown: string): { phone: string | null; email: string | null; name: string | null; address: string | null } {
@@ -179,10 +209,7 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
     const emailMatch = line.match(EMAIL_REGEX);
     if (emailMatch && !currentEmail) {
       const email = emailMatch[0];
-      // Skip common non-personal emails
-      if (!email.match(/^(info|contact|admin|noreply|no-reply|support|hello|office)@/i)) {
-        currentEmail = email;
-      } else if (!currentEmail) {
+      if (!isJunkEmail(email)) {
         currentEmail = email;
       }
     }
@@ -206,14 +233,13 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
 
   // Strategy 2: Bulk extraction if no structured leads
   if (leads.length === 0) {
-    const allEmails = markdown.match(EMAIL_REGEX) || [];
+    const allEmails = (markdown.match(EMAIL_REGEX) || []).filter(e => !isJunkEmail(e));
     const allMobiles = markdown.match(MOBILE_REGEX) || [];
 
     const titleMatch = markdown.match(/^#\s+(.+)/m);
     const pageTitle = titleMatch ? titleMatch[1].trim() : new URL(url).hostname.replace(/^www\./, '');
 
     if (allMobiles.length > 0) {
-      // Extract each unique mobile as a potential lead
       const seenPhones = new Set<string>();
       for (const mobile of allMobiles) {
         const cleaned = mobile.replace(/[^\d+]/g, '');
@@ -431,13 +457,13 @@ Deno.serve(async (req) => {
     console.log(`[Sofia] Total unique leads from Firecrawl: ${uniqueLeads.length}`);
 
     // ========== PHASE 2: Deep scrape leads — try multiple contact pages ==========
-    const CONTACT_PATHS = ['/contact', '/contactez-nous', '/kontakt', '/nous-contacter', '/over-ons', '/about', '/a-propos'];
+    const CONTACT_PATHS = ['/contact', '/contactez-nous', '/a-propos'];
 
     // Scrape ALL leads that have a website — even those with phone, to find mobile if they only have landline
     const leadsNeedingScrape = uniqueLeads.filter(l => l.website);
     console.log(`[Sofia] ${leadsNeedingScrape.length} leads will be deep scraped`);
 
-    const scrapePromises = leadsNeedingScrape.slice(0, 30).map(async (lead) => {
+    const scrapePromises = leadsNeedingScrape.slice(0, 15).map(async (lead) => {
       try {
         const baseUrl = lead.website!.replace(/\/$/, '');
         const urlsToTry = [
@@ -461,30 +487,51 @@ Deno.serve(async (req) => {
             const markdown = data.data?.markdown || data.markdown || '';
             if (markdown.length < 50) continue;
 
-            // Try JSON-LD first
+            // Try JSON-LD first (most reliable structured data)
             const jsonLd = extractFromJsonLd(markdown);
             if (jsonLd.phone && !lead.phone) {
               lead.phone = jsonLd.phone.replace(/[^\d+]/g, '');
             }
-            if (jsonLd.email && !lead.email) {
+            if (jsonLd.email && !lead.email && !isJunkEmail(jsonLd.email)) {
               lead.email = jsonLd.email;
             }
 
-            // Extract email
-            const emailMatch = markdown.match(EMAIL_REGEX);
-            if (emailMatch && !lead.email) {
-              lead.email = emailMatch[0];
+            // Extract ALL emails from the page and pick the best one
+            if (!lead.email) {
+              const allEmails = [...new Set(markdown.match(EMAIL_REGEX) || [])];
+              const validEmails = allEmails.filter(e => !isJunkEmail(e));
+              if (validEmails.length > 0) {
+                // Prefer personal emails over generic ones (info@, contact@)
+                const personalEmail = validEmails.find(e =>
+                  !e.match(/^(info|contact|admin|support|hello|office|reception|accueil|secretariat|general)@/i)
+                );
+                lead.email = personalEmail || validEmails[0];
+                console.log(`[Sofia] 📧 Found email for ${lead.company_name}: ${lead.email}`);
+              }
             }
 
             // Extract Belgian mobile only — no landlines
             const mobileMatch = markdown.match(MOBILE_REGEX);
-            if (mobileMatch) {
+            if (mobileMatch && !lead.phone) {
               const cleaned = mobileMatch[0].replace(/[^\d+]/g, '');
               lead.phone = cleaned.startsWith('+') ? cleaned : '+' + cleaned;
               console.log(`[Sofia] ✅ Enriched ${lead.company_name}: mobile ${lead.phone}`);
-              break; // Found mobile, no need to try more pages
             }
+
+            // If we have both phone and email, we're done with this lead
+            if (lead.phone && lead.email) break;
+            // If we found at least something useful, continue trying other pages for the missing piece
           } catch { /* try next URL */ }
+        }
+        // Last resort: guess email from website domain (info@domain.be)
+        if (!lead.email && lead.website) {
+          try {
+            const domain = new URL(lead.website).hostname.replace(/^www\./, '');
+            if (domain.endsWith('.be') || domain.endsWith('.com') || domain.endsWith('.eu')) {
+              lead.email = `info@${domain}`;
+              console.log(`[Sofia] 📧 Guessed email for ${lead.company_name}: ${lead.email}`);
+            }
+          } catch { /* invalid URL */ }
         }
       } catch (e) {
         console.error(`[Sofia] Scrape error for ${lead.company_name}:`, e);
@@ -622,12 +669,15 @@ Deno.serve(async (req) => {
       // Format phone as +32 4XX XX XX XX
       const formattedPhone = formatBelgianMobile(lead.phone);
 
+      // Final email sanitization — remove directory emails
+      const cleanEmail = (lead.email && !isJunkEmail(lead.email)) ? lead.email : null;
+
       existingPhones.add(normalizedDigits);
 
       const { error: insertError } = await supabase.from('leads').insert({
         contact_name: lead.contact_name || null,
         company_name: lead.company_name,
-        email: lead.email || null,
+        email: cleanEmail,
         phone: formattedPhone,
         whatsapp_number: normalizedDigits,
         location: lead.location || null,
