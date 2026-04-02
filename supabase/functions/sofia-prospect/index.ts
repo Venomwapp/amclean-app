@@ -132,7 +132,8 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
   // First try JSON-LD extraction (most reliable)
   const jsonLd = extractFromJsonLd(markdown);
   if (jsonLd.name && jsonLd.phone) {
-    leads.push(createLead(jsonLd.name, jsonLd.phone, jsonLd.email, jsonLd.address, url, niche));
+    const jsonLdLead = createLead(jsonLd.name, jsonLd.phone, jsonLd.email, jsonLd.address, url, niche);
+    if (jsonLdLead) leads.push(jsonLdLead);
   }
 
   // Strategy 1: Structured listings (directory pages)
@@ -157,7 +158,8 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
       const match = line.match(pattern);
       if (match && match[1] && match[1].length > 2 && match[1].length < 80) {
         if (currentName && (currentPhone || currentEmail)) {
-          leads.push(createLead(currentName, currentPhone, currentEmail, currentAddress, currentWebsite, niche));
+          const newLead = createLead(currentName, currentPhone, currentEmail, currentAddress, currentWebsite, niche);
+          if (newLead) leads.push(newLead);
         }
         currentName = match[1].replace(/\*\*/g, '').replace(/\[|\]/g, '').trim();
         currentPhone = null;
@@ -218,12 +220,32 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
         if (seenPhones.has(cleaned)) continue;
         seenPhones.add(cleaned);
         const email = allEmails.length > 0 ? allEmails[0] : null;
-        leads.push(createLead(pageTitle + (seenPhones.size > 1 ? ` (${seenPhones.size})` : ''), mobile, email, null, url, niche));
+        const bulkLead = createLead(pageTitle + (seenPhones.size > 1 ? ` (${seenPhones.size})` : ''), mobile, email, null, url, niche);
+        if (bulkLead) leads.push(bulkLead);
       }
     }
   }
 
   return leads;
+}
+
+// Clean company name: remove URLs, junk text, markdown artifacts
+function cleanCompanyName(raw: string): string {
+  let name = raw
+    .replace(/https?:\/\/[^\s]+/g, '')    // Remove URLs
+    .replace(/www\.[^\s]+/g, '')           // Remove www.
+    .replace(/[#*\[\](){}|]/g, '')         // Remove markdown chars
+    .replace(/^\d+\.\s*/, '')              // Remove leading numbers "1. "
+    .replace(/^[-–—•]\s*/, '')             // Remove leading bullets
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Skip names that are clearly not business names
+  if (name.length < 3 || name.length > 80) return '';
+  if (/^(http|www\.|enregistrez|inscri|connexion|login|sign|cookie|accept|lire|voir|page|click|logo of)/i.test(name)) return '';
+  if (/^\d+$/.test(name)) return '';
+
+  return name;
 }
 
 function createLead(
@@ -234,8 +256,11 @@ function createLead(
   website: string | null,
   niche: string,
 ): ExtractedLead {
+  const cleanedName = cleanCompanyName(name);
+  if (!cleanedName) return null as unknown as ExtractedLead;
+
   return {
-    company_name: name.substring(0, 100),
+    company_name: cleanedName.substring(0, 100),
     contact_name: null,
     email: email,
     phone: phone ? phone.replace(/[^\d+]/g, '') : null,
@@ -247,6 +272,7 @@ function createLead(
   };
 }
 
+// Normalize to raw digits: 324XXXXXXXX
 function normalizePhone(phone: string): string {
   let p = phone.replace(/[^\d+]/g, '');
   if (p.startsWith('+')) p = p.substring(1);
@@ -254,6 +280,14 @@ function normalizePhone(phone: string): string {
   if (p.startsWith('0')) p = '32' + p.substring(1);
   if (!p.startsWith('32') && p.length <= 9) p = '32' + p;
   return p;
+}
+
+// Format as +32 4XX XX XX XX for display/storage
+function formatBelgianMobile(phone: string): string {
+  const digits = normalizePhone(phone); // e.g. 32478123456
+  if (!digits.startsWith('324') || digits.length !== 11) return '+' + digits;
+  // +32 4XX XX XX XX
+  return `+32 ${digits[2]}${digits[3]}${digits[4]} ${digits[5]}${digits[6]} ${digits[7]}${digits[8]} ${digits[9]}${digits[10]}`;
 }
 
 // Normalize company name for dedup (remove legal suffixes, lowercase, trim)
@@ -532,45 +566,11 @@ Deno.serve(async (req) => {
       console.log(`[Sofia] After fallback expansion — qualified: ${qualifiedLeads.length}`);
     }
 
-    // ========== PHASE 4: WhatsApp verification + insertion ==========
-    const evoUrl = Deno.env.get('EVOLUTION_API_URL');
-    const evoKey = Deno.env.get('EVOLUTION_API_KEY');
-    const evoInstance = Deno.env.get('EVOLUTION_INSTANCE_NAME');
-    const canCheckWhatsApp = !!(evoUrl && evoKey && evoInstance);
-
-    if (!canCheckWhatsApp) {
-      console.log('[Sofia] Evolution API not configured — skipping WhatsApp verification');
-    }
-
-    async function checkWhatsApp(phone: string): Promise<'verified' | 'not_found' | 'error'> {
-      if (!canCheckWhatsApp) return 'verified';
-      const number = normalizePhone(phone);
-      try {
-        const resp = await fetch(`${evoUrl}/chat/whatsappNumbers/${evoInstance}`, {
-          method: 'POST',
-          headers: { apikey: evoKey!, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ numbers: [number] }),
-        });
-        if (!resp.ok) {
-          console.error(`[Sofia] WhatsApp check failed (${resp.status}) for ${number}`);
-          return 'error';
-        }
-        const data = await resp.json();
-        const result = Array.isArray(data) ? data[0] : data;
-        const exists = result?.exists === true || result?.numberExists === true;
-        console.log(`[Sofia] WhatsApp check ${number}: ${exists ? 'EXISTS' : 'NOT FOUND'}`);
-        return exists ? 'verified' : 'not_found';
-      } catch (e) {
-        console.error(`[Sofia] WhatsApp check error for ${number}:`, e);
-        return 'error';
-      }
-    }
-
-    // Also check for duplicates by phone number (not just company name)
+    // ========== PHASE 4: Dedup + insertion (no WhatsApp verification) ==========
+    // Check for duplicates by phone number (not just company name)
     const existingPhones = new Set<string>();
     if (qualifiedLeads.length > 0) {
       const phonesToCheck = qualifiedLeads.map(l => normalizePhone(l.phone!));
-      // Batch check existing phones in DB
       const { data: existingLeads } = await supabase
         .from('leads')
         .select('phone, whatsapp_number')
@@ -579,17 +579,15 @@ Deno.serve(async (req) => {
       if (existingLeads) {
         for (const el of existingLeads) {
           if (el.phone) existingPhones.add(normalizePhone(el.phone));
-          if (el.whatsapp_number) existingPhones.add(el.whatsapp_number);
+          if (el.whatsapp_number) existingPhones.add(normalizePhone(el.whatsapp_number));
         }
       }
     }
 
     let leadsInserted = 0;
-    let leadsWhatsAppVerified = 0;
     let leadsSkippedDuplicate = 0;
-    let leadsSkippedNoWhatsApp = 0;
 
-    const leadsToProcess = qualifiedLeads.slice(0, maxLeads * 2); // Process more to account for skips
+    const leadsToProcess = qualifiedLeads.slice(0, maxLeads * 2);
 
     for (const lead of leadsToProcess) {
       if (leadsInserted >= maxLeads) break;
@@ -598,13 +596,13 @@ Deno.serve(async (req) => {
       if (!lead.phone || lead.phone.trim().length < 5) continue;
 
       // Final guard: only Belgian mobile
-      const normalizedCheck = normalizePhone(lead.phone);
-      if (!normalizedCheck.startsWith('324')) {
+      const normalizedDigits = normalizePhone(lead.phone);
+      if (!normalizedDigits.startsWith('324') || normalizedDigits.length !== 11) {
         continue;
       }
 
       // Check phone dedup
-      if (existingPhones.has(normalizedCheck)) {
+      if (existingPhones.has(normalizedDigits)) {
         leadsSkippedDuplicate++;
         continue;
       }
@@ -621,36 +619,17 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // WhatsApp verification
-      const normalized = normalizePhone(lead.phone);
-      let whatsappNumber: string | null = null;
+      // Format phone as +32 4XX XX XX XX
+      const formattedPhone = formatBelgianMobile(lead.phone);
 
-      if (canCheckWhatsApp) {
-        const result = await checkWhatsApp(lead.phone);
-        if (result === 'verified') {
-          whatsappNumber = normalized;
-          leadsWhatsAppVerified++;
-        } else if (result === 'not_found') {
-          leadsSkippedNoWhatsApp++;
-          console.log(`[Sofia] Skipping ${lead.company_name}: ${normalized} not on WhatsApp`);
-          continue;
-        } else {
-          // API error — skip to be safe (only WhatsApp verified leads)
-          console.log(`[Sofia] Skipping ${lead.company_name}: WhatsApp check error`);
-          continue;
-        }
-      } else {
-        whatsappNumber = normalized;
-      }
-
-      existingPhones.add(normalized); // Prevent inserting same phone twice in this run
+      existingPhones.add(normalizedDigits);
 
       const { error: insertError } = await supabase.from('leads').insert({
         contact_name: lead.contact_name || null,
         company_name: lead.company_name,
         email: lead.email || null,
-        phone: lead.phone,
-        whatsapp_number: whatsappNumber,
+        phone: formattedPhone,
+        whatsapp_number: normalizedDigits,
         location: lead.location || null,
         space_type: lead.space_type || null,
         service_requested: searchNiche,
@@ -659,11 +638,12 @@ Deno.serve(async (req) => {
         source: 'prospecting',
         active_agent: 'sophie',
         language: 'fr',
-        notes: `[Sofia] Niche: ${searchNiche} | Région: ${searchRegion} | Source: Firecrawl Search${whatsappNumber ? ' | ✅ WhatsApp vérifié' : ''}`,
+        notes: `[Sofia] Niche: ${searchNiche} | Région: ${searchRegion} | Source: Firecrawl Search`,
       });
 
       if (!insertError) {
         leadsInserted++;
+        console.log(`[Sofia] ✅ Inserted: ${lead.company_name} | ${formattedPhone}`);
       } else {
         console.error(`[Sofia] Insert error for ${lead.company_name}:`, insertError);
       }
@@ -682,10 +662,10 @@ Deno.serve(async (req) => {
     await supabase.from('activity_log').insert({
       type: 'prospecting',
       title: `Sofia — ${leadsInserted} leads prospectés`,
-      description: `Niche: ${searchNiche} | Région: ${searchRegion} | Trouvés: ${uniqueLeads.length} | Mobiles: ${qualifiedLeads.length} | Insérés: ${leadsInserted} | WhatsApp: ${leadsWhatsAppVerified} | Duplicatas: ${leadsSkippedDuplicate} | Sans WhatsApp: ${leadsSkippedNoWhatsApp}`,
+      description: `Niche: ${searchNiche} | Région: ${searchRegion} | Trouvés: ${uniqueLeads.length} | Mobiles: ${qualifiedLeads.length} | Insérés: ${leadsInserted} | Duplicatas: ${leadsSkippedDuplicate}`,
     });
 
-    console.log(`[Sofia] ✅ Done — Found: ${uniqueLeads.length}, Mobiles: ${qualifiedLeads.length}, Inserted: ${leadsInserted}, WhatsApp: ${leadsWhatsAppVerified}, Duplicates: ${leadsSkippedDuplicate}, No WhatsApp: ${leadsSkippedNoWhatsApp}`);
+    console.log(`[Sofia] ✅ Done — Found: ${uniqueLeads.length}, Mobiles: ${qualifiedLeads.length}, Inserted: ${leadsInserted}, Duplicates: ${leadsSkippedDuplicate}`);
 
     return new Response(
       JSON.stringify({
@@ -693,9 +673,7 @@ Deno.serve(async (req) => {
         leads_found: uniqueLeads.length,
         leads_qualified: qualifiedLeads.length,
         leads_inserted: leadsInserted,
-        leads_whatsapp_verified: leadsWhatsAppVerified,
         leads_skipped_duplicate: leadsSkippedDuplicate,
-        leads_skipped_no_whatsapp: leadsSkippedNoWhatsApp,
         run_id: runId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
