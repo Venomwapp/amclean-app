@@ -1,0 +1,1 @@
+ALTER TABLE public.leads ADD COLUMN nps_data jsonb DEFAULT NULL;

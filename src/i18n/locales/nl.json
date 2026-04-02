@@ -1,0 +1,233 @@
+{
+  "nav": {
+    "home": "Home",
+    "services": "Diensten",
+    "about": "Over Ons",
+    "zones": "Zones",
+    "contact": "Contact",
+    "quote": "Gratis Offerte"
+  },
+  "hero": {
+    "title_line1": "WELKOM BIJ",
+    "title_line2": "AM CLEAN",
+    "tagline": "Uitmuntendheid in Professionele Reiniging in België",
+    "title": "Professionele Schoonmaak Uitmuntendheid in Brussel",
+    "subtitle": "Premium schoonmaakdiensten voor bedrijven, mede-eigendommen en woningen. 24/7 beschikbaarheid, meertalig personeel.",
+    "cta_primary": "Vraag een offerte",
+    "cta_secondary": "Onze diensten",
+    "badge_team": "Ervaren Team",
+    "badge_reliable": "Betrouwbare Service",
+    "badge_custom": "Oplossingen op Maat"
+  },
+  "stats": {
+    "companies": "Bedrijven gediend",
+    "availability": "Beschikbaarheid",
+    "languages": "Talen",
+    "eco": "Milieuvriendelijke producten beschikbaar"
+  },
+  "services": {
+    "title": "Onze Diensten",
+    "subtitle": "Schoonmaakoplossingen op maat van al uw behoeften",
+    "commercial": {
+      "title": "Commerciële Schoonmaak",
+      "description": "Kantoren, klinieken, hotels, winkels",
+      "cta": "Meer weten"
+    },
+    "condo": {
+      "title": "Mede-eigendom Schoonmaak",
+      "description": "Diensten voor syndici en beheerders",
+      "cta": "Meer weten"
+    },
+    "specialized": {
+      "title": "Gespecialiseerde Schoonmaak",
+      "description": "Na bouw, desinfectie, hoge ramen",
+      "cta": "Meer weten"
+    },
+    "outdoor": {
+      "title": "Buitenreiniging",
+      "description": "Gevels, terrassen, garages",
+      "cta": "Meer weten"
+    },
+    "page": {
+      "title": "Onze Professionele Schoonmaakdiensten",
+      "subtitle": "Complete oplossingen voor bedrijven en particulieren",
+      "offices": "Kantoorschoonmaak",
+      "offices_desc": "Productieve en gezonde werkruimtes",
+      "clinics": "Medische Kliniek Schoonmaak",
+      "clinics_desc": "Strikte hygiënenormen nageleefd",
+      "bakeries": "Bakkerij Schoonmaak",
+      "bakeries_desc": "Voedselveiligheidsnormen gerespecteerd",
+      "retail": "Winkel & Winkelcentrum Schoonmaak",
+      "retail_desc": "Onberispelijke netheid voor uw klanten",
+      "hotels": "Hotelschoonmaak",
+      "hotels_desc": "Gegarandeerde gastvrijheid uitmuntendheid",
+      "schools": "School & Institutie Schoonmaak",
+      "schools_desc": "Gezonde omgeving voor leren",
+      "industries": "Industriële Schoonmaak",
+      "industries_desc": "Oplossingen voor productielocaties",
+      "casinos": "Casino Schoonmaak",
+      "casinos_desc": "Onberispelijke omgeving voor uw spelruimtes",
+      "car_dealerships": "Autodealer Schoonmaak",
+      "car_dealerships_desc": "Showrooms en werkplaatsen altijd vlekkeloos",
+      "condo_title": "Mede-eigendom Schoonmaak",
+      "condo_main": "Mede-eigendom Schoonmaak",
+      "condo_main_desc": "Gemeenschappelijke ruimtes, trappenhuizen, lobby's",
+      "syndic": "Diensten voor Syndici",
+      "syndic_desc": "Contracten op maat, flexibele planning",
+      "end_lease": "Einde Huurcontract Schoonmaak",
+      "end_lease_desc": "Volledige herstel van de lokalen",
+      "specialized_title": "Gespecialiseerde Schoonmaak",
+      "disinfection": "Commerciële en Residentiële Desinfectie",
+      "windows": "Raam- en Jaloeziereiniging",
+      "moving": "Schoonmaak na Verhuizing",
+      "construction": "Schoonmaak na Bouw / Einde Werf",
+      "high_windows": "Hoge Ramen Schoonmaak",
+      "solar_panels": "Zonnepanelen Schoonmaak",
+      "osmosis": "Zuiver Water Reiniging door Omgekeerde Osmose",
+      "glass_roofs": "Glazen Dak en Kas Schoonmaak",
+      "outdoor_title": "Buitenreiniging",
+      "facades": "Gevelreiniging",
+      "outdoor_spaces": "Buitenruimte Schoonmaak",
+      "stairs": "Trappenreiniging",
+      "garages": "Garagereiniging",
+      "terraces": "Terrasreiniging",
+      "surfaces_title": "Oppervlakte Schoonmaak",
+      "surfaces_desc": "Vloerbehandeling, stofzuigen, vegen, afstoffen en afvalbeheer",
+      "floor_treatment": "Vloerbehandeling en Onderhoud",
+      "floor_treatment_desc": "Alle soorten vloeren",
+      "general_title": "Algemene Diensten",
+      "general_items": [
+        "Diensten voor bedrijven en particulieren",
+        "Residentiële, commerciële en industriële gebouwen",
+        "Eenmalige schoonmaak mogelijk",
+        "Uitgebreide uren, 24/7 beschikbaarheid",
+        "Altijd gratis offertes",
+        "Facturering beschikbaar",
+        "Meertalig personeel (FR/EN/NL)",
+        "Schoonmaakproducten inbegrepen",
+        "Milieuvriendelijke chemicaliënvrije reiniging",
+        "Gespecialiseerde en aangepaste apparatuur"
+      ]
+    }
+  },
+  "why": {
+    "title": "Waarom AM Clean?",
+    "subtitle": "Uitmuntendheid die het verschil maakt",
+    "flexibility": {
+      "title": "Totale Flexibiliteit",
+      "description": "Schema's aangepast aan uw behoeften, 24/7 interventies mogelijk. We passen ons aan uw planning aan."
+    },
+    "staff": {
+      "title": "Gekwalificeerd Meertalig Personeel",
+      "description": "Team opgeleid in de nieuwste technieken, spreekt Frans, Engels en Nederlands voor vlotte communicatie."
+    },
+    "eco": {
+      "title": "Milieuvriendelijke Producten",
+      "description": "Duurzame en milieuvriendelijke schoonmaakoplossingen beschikbaar op aanvraag."
+    }
+  },
+  "coverage": {
+    "title": "Heel België",
+    "subtitle": "Van Brussel tot Antwerpen, van Gent tot Luik - we werken in heel België",
+    "more": "En in alle andere steden en gemeenten in België"
+  },
+  "trust": {
+    "badge": "Gecertificeerde Kwaliteit",
+    "title": "Vertrouwd door 500+ Bedrijven",
+    "subtitle": "Jaren expertise ten dienste van uw tevredenheid",
+    "guaranteed": "Tevredenheid Gegarandeerd",
+    "experience": "Jaren Ervaring",
+    "clients": "Tevreden Klanten",
+    "satisfaction": "Tevredenheidspercentage"
+  },
+  "cta": {
+    "title": "Klaar om uw ruimtes te transformeren?",
+    "subtitle": "Gratis offerte binnen 24u",
+    "button": "Vraag een offerte"
+  },
+  "contact": {
+    "title": "Vraag Uw Gratis Offerte Aan",
+    "subtitle": "Antwoord gegarandeerd binnen 24u",
+    "form": {
+      "name": "Volledige naam",
+      "company": "Bedrijfsnaam (optioneel)",
+      "email": "E-mail",
+      "phone": "Telefoon",
+      "service_type": "Type dienst",
+      "service_options": {
+        "placeholder": "Selecteer een dienst",
+        "commercial": "Commerciële Schoonmaak",
+        "condo": "Mede-eigendom",
+        "specialized": "Gespecialiseerde Schoonmaak",
+        "outdoor": "Buitenreiniging",
+        "other": "Anders"
+      },
+      "frequency": "Gewenste frequentie",
+      "frequency_options": {
+        "placeholder": "Selecteer frequentie",
+        "once": "Eenmalig",
+        "weekly": "Wekelijks",
+        "monthly": "Maandelijks",
+        "custom": "Te bepalen"
+      },
+      "message": "Beschrijf uw behoeften",
+      "submit": "Verstuur mijn aanvraag",
+      "submitting": "Verzenden..."
+    },
+    "info": {
+      "phone": "Telefoon",
+      "email": "E-mail",
+      "area": "Werkgebied",
+      "area_value": "Brussel en Brussels Hoofdstedelijk Gewest",
+      "availability": "Beschikbaarheid",
+      "availability_value": "24/7 op aanvraag",
+      "whatsapp": "Contacteer ons via WhatsApp"
+    },
+    "features": [
+      "Snelle reactie gegarandeerd",
+      "Gratis offerte zonder verplichting",
+      "24/7 beschikbaarheid"
+    ],
+    "success": {
+      "title": "Aanvraag verzonden!",
+      "message": "We nemen binnen 24 uur contact met u op."
+    }
+  },
+  "about": {
+    "page": {
+      "title": "AM Clean - Uitmuntendheid en Vertrouwen",
+      "subtitle": "Uw vertrouwde partner voor professionele schoonmaak",
+      "story_title": "Ons Verhaal",
+      "story": "AM Clean is een professioneel schoonmaakbedrijf gevestigd in België, gespecialiseerd in B2B en hoogwaardige residentiële diensten. Opgericht door Meyri Andrade, onderscheiden we ons door onze inzet voor kwaliteit, flexibiliteit en klanttevredenheid.",
+      "values_title": "Onze Waarden",
+      "professionalism": {
+        "title": "Professionaliteit",
+        "description": "Getraind team, strikte procedures en onberispelijke resultaten bij elke interventie."
+      },
+      "flexibility": {
+        "title": "Flexibiliteit",
+        "description": "Aanpassing aan uw behoeften, schema's op maat en gepersonaliseerde oplossingen."
+      },
+      "trust": {
+        "title": "Vertrouwen",
+        "description": "Duurzame relaties, totale transparantie en toewijding aan uw tevredenheid."
+      },
+      "commitment_title": "Onze Toewijding",
+      "commitments": [
+        "Consistente kwaliteit",
+        "Gekwalificeerd meertalig personeel",
+        "Milieuvriendelijke producten beschikbaar",
+        "24/7 reactievermogen",
+        "Gratis en transparante offertes"
+      ]
+    }
+  },
+  "footer": {
+    "tagline": "Professionele schoonmaak uitmuntendheid",
+    "services": "Diensten",
+    "contact": "Contact",
+    "follow": "Volg ons",
+    "rights": "Alle rechten voorbehouden",
+    "privacy": "Privacybeleid"
+  }
+}

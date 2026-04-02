@@ -1,0 +1,1 @@
+DELETE FROM leads WHERE phone LIKE '02%' OR phone LIKE '+3202%' OR phone LIKE '3202%' OR phone LIKE '003202%';

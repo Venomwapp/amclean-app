@@ -1,0 +1,49 @@
+project_id = "juqtijwhwghtvtuiuaba"
+
+[functions.webhook-evolution]
+verify_jwt = false
+
+[functions.process-followups]
+verify_jwt = false
+
+[functions.send-reminders]
+verify_jwt = false
+
+[functions.admin-send-message]
+verify_jwt = false
+
+[functions.setup-admin]
+verify_jwt = false
+
+[functions.manage-users]
+verify_jwt = false
+
+[functions.sofia-prospect]
+verify_jwt = false
+
+[functions.whatsapp-instance]
+verify_jwt = false
+
+[functions.sofia-outreach]
+verify_jwt = false
+
+[functions.emma-onboarding]
+verify_jwt = false
+
+[functions.emma-nps-cron]
+verify_jwt = false
+
+[functions.auto-qualify]
+verify_jwt = false
+
+[functions.telegram-notify]
+verify_jwt = false
+
+[functions.telegram-poll]
+verify_jwt = false
+
+[functions.generate-quote-pdf]
+verify_jwt = false
+
+[functions.send-quote-email]
+verify_jwt = false

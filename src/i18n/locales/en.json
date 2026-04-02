@@ -1,0 +1,233 @@
+{
+  "nav": {
+    "home": "Home",
+    "services": "Services",
+    "about": "About",
+    "zones": "Areas",
+    "contact": "Contact",
+    "quote": "Free Quote"
+  },
+  "hero": {
+    "title_line1": "WELCOME TO",
+    "title_line2": "AM CLEAN",
+    "tagline": "Excellence in Professional Cleaning across Belgium",
+    "title": "Professional Cleaning Excellence in Brussels",
+    "subtitle": "Premium cleaning services for businesses, condominiums, and residences. 24/7 availability, multilingual staff.",
+    "cta_primary": "Request a quote",
+    "cta_secondary": "Our services",
+    "badge_team": "Experienced Team",
+    "badge_reliable": "Reliable Service",
+    "badge_custom": "Custom Solutions"
+  },
+  "stats": {
+    "companies": "Companies served",
+    "availability": "Availability",
+    "languages": "Languages",
+    "eco": "Eco-friendly products available"
+  },
+  "services": {
+    "title": "Our Services",
+    "subtitle": "Cleaning solutions tailored to all your needs",
+    "commercial": {
+      "title": "Commercial Cleaning",
+      "description": "Offices, clinics, hotels, retail",
+      "cta": "Learn more"
+    },
+    "condo": {
+      "title": "Condominium Cleaning",
+      "description": "Services for property managers",
+      "cta": "Learn more"
+    },
+    "specialized": {
+      "title": "Specialized Cleaning",
+      "description": "Post-construction, disinfection, high windows",
+      "cta": "Learn more"
+    },
+    "outdoor": {
+      "title": "Outdoor Cleaning",
+      "description": "Facades, terraces, garages",
+      "cta": "Learn more"
+    },
+    "page": {
+      "title": "Our Professional Cleaning Services",
+      "subtitle": "Complete solutions for businesses and individuals",
+      "offices": "Office Cleaning",
+      "offices_desc": "Productive and healthy workspaces",
+      "clinics": "Medical Clinic Cleaning",
+      "clinics_desc": "Strict hygiene standards met",
+      "bakeries": "Bakery Cleaning",
+      "bakeries_desc": "Food safety standards compliant",
+      "retail": "Retail & Shopping Center Cleaning",
+      "retail_desc": "Impeccable cleanliness for your customers",
+      "hotels": "Hotel Cleaning",
+      "hotels_desc": "Guaranteed hospitality excellence",
+      "schools": "School & Institution Cleaning",
+      "schools_desc": "Healthy environment for learning",
+      "industries": "Industrial Cleaning",
+      "industries_desc": "Solutions for production sites",
+      "casinos": "Casino Cleaning",
+      "casinos_desc": "Impeccable environment for your gaming spaces",
+      "car_dealerships": "Car Dealership Cleaning",
+      "car_dealerships_desc": "Showrooms and workshops always spotless",
+      "condo_title": "Condominium Cleaning",
+      "condo_main": "Condominium Cleaning",
+      "condo_main_desc": "Common areas, stairwells, lobbies",
+      "syndic": "Property Manager Services",
+      "syndic_desc": "Custom contracts, flexible scheduling",
+      "end_lease": "End of Lease Cleaning",
+      "end_lease_desc": "Complete restoration of premises",
+      "specialized_title": "Specialized Cleaning",
+      "disinfection": "Commercial and Residential Disinfection",
+      "windows": "Window and Blind Cleaning",
+      "moving": "Post-Move Cleaning",
+      "construction": "Post-Construction / End of Site Cleaning",
+      "high_windows": "High-Rise Window Cleaning",
+      "solar_panels": "Solar Panel Cleaning",
+      "osmosis": "Pure Water Cleaning by Reverse Osmosis",
+      "glass_roofs": "Glass Roof and Greenhouse Cleaning",
+      "outdoor_title": "Outdoor Cleaning",
+      "facades": "Facade Cleaning",
+      "outdoor_spaces": "Outdoor Space Cleaning",
+      "stairs": "Staircase Cleaning",
+      "garages": "Garage Cleaning",
+      "terraces": "Terrace Cleaning",
+      "surfaces_title": "Surface Cleaning",
+      "surfaces_desc": "Floor treatment, vacuuming, sweeping, dusting and waste management",
+      "floor_treatment": "Floor Treatment and Maintenance",
+      "floor_treatment_desc": "All types of flooring",
+      "general_title": "General Services",
+      "general_items": [
+        "Services for businesses and individuals",
+        "Residential, commercial and industrial buildings",
+        "One-time cleaning available",
+        "Extended hours, 24/7 availability",
+        "Free quotes always provided",
+        "Invoicing available",
+        "Multilingual staff (FR/EN/NL)",
+        "Cleaning products included",
+        "Eco-friendly chemical-free cleaning",
+        "Specialized and adapted equipment"
+      ]
+    }
+  },
+  "why": {
+    "title": "Why AM Clean?",
+    "subtitle": "Excellence that makes the difference",
+    "flexibility": {
+      "title": "Total Flexibility",
+      "description": "Schedules adapted to your needs, 24/7 interventions possible. We adapt to your schedule."
+    },
+    "staff": {
+      "title": "Qualified Multilingual Staff",
+      "description": "Team trained in the latest techniques, speaking French, English, and Dutch for smooth communication."
+    },
+    "eco": {
+      "title": "Eco-Friendly Products",
+      "description": "Sustainable and environmentally friendly cleaning solutions available on request."
+    }
+  },
+  "coverage": {
+    "title": "All of Belgium",
+    "subtitle": "From Brussels to Antwerp, from Ghent to Liège - we operate throughout Belgium",
+    "more": "And in all other cities and municipalities in Belgium"
+  },
+  "trust": {
+    "badge": "Certified Quality",
+    "title": "Trusted by 500+ Companies",
+    "subtitle": "Years of expertise at the service of your satisfaction",
+    "guaranteed": "Satisfaction Guaranteed",
+    "experience": "Years of Experience",
+    "clients": "Satisfied Clients",
+    "satisfaction": "Satisfaction Rate"
+  },
+  "cta": {
+    "title": "Ready to transform your spaces?",
+    "subtitle": "Free quote within 24h",
+    "button": "Request a quote"
+  },
+  "contact": {
+    "title": "Request Your Free Quote",
+    "subtitle": "Response guaranteed within 24h",
+    "form": {
+      "name": "Full name",
+      "company": "Company name (optional)",
+      "email": "Email",
+      "phone": "Phone",
+      "service_type": "Service type",
+      "service_options": {
+        "placeholder": "Select a service",
+        "commercial": "Commercial Cleaning",
+        "condo": "Condominium",
+        "specialized": "Specialized Cleaning",
+        "outdoor": "Outdoor Cleaning",
+        "other": "Other"
+      },
+      "frequency": "Desired frequency",
+      "frequency_options": {
+        "placeholder": "Select frequency",
+        "once": "One-time",
+        "weekly": "Weekly",
+        "monthly": "Monthly",
+        "custom": "To be defined"
+      },
+      "message": "Describe your needs",
+      "submit": "Send my request",
+      "submitting": "Sending..."
+    },
+    "info": {
+      "phone": "Phone",
+      "email": "Email",
+      "area": "Service area",
+      "area_value": "Brussels and Brussels-Capital Region",
+      "availability": "Availability",
+      "availability_value": "24/7 on request",
+      "whatsapp": "Contact us on WhatsApp"
+    },
+    "features": [
+      "Quick response guaranteed",
+      "Free quote with no obligation",
+      "24/7 availability"
+    ],
+    "success": {
+      "title": "Request sent!",
+      "message": "We will contact you within 24 hours."
+    }
+  },
+  "about": {
+    "page": {
+      "title": "AM Clean - Excellence and Trust",
+      "subtitle": "Your trusted partner for professional cleaning",
+      "story_title": "Our Story",
+      "story": "AM Clean is a professional cleaning company based in Belgium, specializing in B2B and high-end residential services. Founded by Meyri Andrade, we stand out through our commitment to quality, flexibility, and customer satisfaction.",
+      "values_title": "Our Values",
+      "professionalism": {
+        "title": "Professionalism",
+        "description": "Trained team, rigorous procedures, and impeccable results with every intervention."
+      },
+      "flexibility": {
+        "title": "Flexibility",
+        "description": "Adaptation to your needs, custom schedules, and personalized solutions."
+      },
+      "trust": {
+        "title": "Trust",
+        "description": "Lasting relationships, total transparency, and commitment to your satisfaction."
+      },
+      "commitment_title": "Our Commitment",
+      "commitments": [
+        "Consistent quality",
+        "Qualified multilingual staff",
+        "Eco-friendly products available",
+        "24/7 responsiveness",
+        "Free and transparent quotes"
+      ]
+    }
+  },
+  "footer": {
+    "tagline": "Professional cleaning excellence",
+    "services": "Services",
+    "contact": "Contact",
+    "follow": "Follow us",
+    "rights": "All rights reserved",
+    "privacy": "Privacy Policy"
+  }
+}
