@@ -13,37 +13,51 @@ interface ExtractedLead {
   location: string | null;
   service_requested: string | null;
   space_type: string | null;
-  score: 'HOT' | 'WARM' | 'COLD' | null;
+  score: null;
   website: string | null;
 }
 
-// Generate search queries for Firecrawl web search
+// ==================== QUERY GENERATION ====================
+
+// All Belgian regions for rotation
+const BELGIAN_REGIONS = [
+  'Bruxelles', 'Ixelles', 'Uccle', 'Etterbeek', 'Woluwe-Saint-Lambert', 'Schaerbeek', 'Anderlecht',
+  'Liège', 'Namur', 'Charleroi', 'Mons', 'Tournai', 'La Louvière',
+  'Anvers', 'Gand', 'Bruges', 'Louvain', 'Malines', 'Hasselt',
+  'Waterloo', 'Wavre', 'Nivelles', 'Ottignies', 'Braine-l\'Alleud',
+  'Arlon', 'Bastogne', 'Marche-en-Famenne', 'Dinant', 'Verviers', 'Eupen',
+];
+
+const nicheVariants: Record<string, string[]> = {
+  'restaurant': ['restaurant', 'brasserie', 'traiteur', 'café restaurant', 'pizzeria'],
+  'bureau': ['bureaux', 'office', 'espace de travail', 'centre d\'affaires'],
+  'hôtel': ['hôtel', 'hotel', 'hébergement', 'auberge', 'B&B', 'chambre d\'hôte'],
+  'clinique': ['clinique', 'cabinet médical', 'centre médical', 'cabinet dentaire', 'maison médicale', 'centre de santé'],
+  'école': ['école', 'institut', 'lycée', 'collège', 'académie', 'centre de formation'],
+  'salle de sport': ['salle de sport', 'fitness', 'club sportif', 'gym', 'centre sportif', 'crossfit'],
+  'pharmacie': ['pharmacie', 'apotheek', 'parapharmacie'],
+  'crèche': ['crèche', 'garderie', 'kinderopvang', 'halte-accueil'],
+  'maison de repos': ['maison de repos', 'résidence seniors', 'woonzorgcentrum', 'home'],
+  'coworking': ['coworking', 'espace partagé', 'shared workspace', 'hub'],
+  'syndic': ['syndic', 'copropriété', 'gestion immobilière', 'gérance'],
+  'magasin': ['magasin', 'boutique', 'commerce', 'shop'],
+  'immeubles': ['immeuble', 'syndic copropriété', 'gestion immeuble', 'résidence'],
+  'cabinet': ['cabinet avocat', 'cabinet comptable', 'notaire', 'fiduciaire', 'expert-comptable'],
+  'agence immobilière': ['agence immobilière', 'immobilier', 'real estate', 'immo'],
+  'construction': ['entreprise de construction', 'bouwbedrijf', 'construction', 'rénovation', 'entrepreneur'],
+  'salon': ['salon de coiffure', 'salon de beauté', 'kapsalon', 'spa', 'institut de beauté', 'barbershop'],
+  'garage': ['garage automobile', 'autogarage', 'carrosserie', 'mécanicien'],
+  'boulangerie': ['boulangerie', 'pâtisserie', 'bakkerij', 'chocolatier'],
+  'supermarché': ['supermarché', 'épicerie', 'supermarkt', 'night shop', 'alimentation'],
+  'nettoyage': ['entreprise de nettoyage', 'société de nettoyage', 'cleaning', 'entretien'],
+  'concessionnaire': ['concessionnaire', 'garage auto', 'vente automobile'],
+  'vétérinaire': ['vétérinaire', 'clinique vétérinaire', 'dierenarts'],
+  'opticien': ['opticien', 'lunetterie', 'optique'],
+  'assurance': ['assurance', 'courtier', 'assureur', 'verzekering'],
+};
+
 function generateSearchQueries(niche: string, region: string): string[] {
   const queries: string[] = [];
-
-  const nicheVariants: Record<string, string[]> = {
-    'restaurant': ['restaurant', 'brasserie', 'traiteur'],
-    'bureau': ['bureaux', 'office', 'espace de travail'],
-    'hôtel': ['hôtel', 'hotel', 'hébergement'],
-    'clinique': ['clinique', 'cabinet médical', 'centre médical', 'cabinet dentaire', 'maison médicale'],
-    'école': ['école', 'institut', 'lycée', 'collège'],
-    'salle de sport': ['salle de sport', 'fitness', 'club sportif', 'gym'],
-    'pharmacie': ['pharmacie', 'apotheek'],
-    'crèche': ['crèche', 'garderie', 'kinderopvang'],
-    'maison de repos': ['maison de repos', 'résidence seniors', 'woonzorgcentrum'],
-    'coworking': ['coworking', 'espace partagé', 'shared workspace'],
-    'syndic': ['syndic', 'copropriété', 'gestion immobilière'],
-    'magasin': ['magasin', 'boutique', 'commerce'],
-    'immeubles': ['immeuble', 'syndic copropriété', 'gestion immeuble'],
-    'cabinet': ['cabinet avocat', 'cabinet comptable', 'notaire'],
-    'agence immobilière': ['agence immobilière', 'immobilier', 'real estate'],
-    'construction': ['entreprise de construction', 'bouwbedrijf', 'construction company'],
-    'salon': ['salon de coiffure', 'salon de beauté', 'kapsalon', 'spa'],
-    'garage': ['garage automobile', 'autogarage', 'carrosserie'],
-    'boulangerie': ['boulangerie', 'pâtisserie', 'bakkerij'],
-    'supermarché': ['supermarché', 'épicerie', 'supermarkt'],
-  };
-
   const nicheLower = niche.toLowerCase().trim();
   let terms = [niche];
 
@@ -54,33 +68,80 @@ function generateSearchQueries(niche: string, region: string): string[] {
     }
   }
 
-  // Generate targeted queries to find business listings with contact info
   for (const term of terms) {
-    queries.push(`${term} ${region} téléphone adresse`);
-    queries.push(`${term} ${region} contact`);
+    // Standard web search queries
+    queries.push(`${term} ${region} téléphone mobile`);
+    queries.push(`${term} ${region} contact GSM`);
+    queries.push(`${term} ${region} 04 numéro`);
+
+    // Directory-targeted queries
+    queries.push(`site:google.com/maps ${term} ${region}`);
+    queries.push(`site:pagesdor.be ${term} ${region}`);
+    queries.push(`site:yelp.be ${term} ${region}`);
+    queries.push(`site:infobel.com ${term} ${region}`);
+
+    // Social media (often has mobile numbers)
+    queries.push(`site:facebook.com ${term} ${region} belgique`);
   }
 
   return [...new Set(queries)];
 }
 
-// Extract leads from scraped markdown content
+// ==================== EXTRACTION ====================
+
+// Belgian mobile regex — only 04x numbers (no landlines)
+const MOBILE_REGEX = /(?:\+32|0032|0)\s*4[5-9][\d\s\-\.\/]{6,10}/g;
+const EMAIL_REGEX = /[\w.-]+@[\w.-]+\.\w{2,}/g;
+
+// Extract JSON-LD structured data from markdown/HTML
+function extractFromJsonLd(markdown: string): { phone: string | null; email: string | null; name: string | null; address: string | null } {
+  const result = { phone: null as string | null, email: null as string | null, name: null as string | null, address: null as string | null };
+
+  // Look for JSON-LD blocks in the content
+  const jsonLdMatches = markdown.matchAll(/"@type"\s*:\s*"(?:LocalBusiness|Organization|Restaurant|Store|MedicalBusiness|HealthAndBeautyBusiness|[^"]+)"/g);
+
+  for (const _ of jsonLdMatches) {
+    // Try to find telephone field near the match
+    const phoneMatch = markdown.match(/"telephone"\s*:\s*"([^"]+)"/);
+    if (phoneMatch) {
+      const phone = phoneMatch[1];
+      // Only keep if it's a mobile number
+      if (phone.match(/(?:\+32|0032|0)\s*4[5-9]/)) {
+        result.phone = phone;
+      }
+    }
+
+    const emailMatch = markdown.match(/"email"\s*:\s*"([^"]+)"/);
+    if (emailMatch) result.email = emailMatch[1];
+
+    const nameMatch = markdown.match(/"name"\s*:\s*"([^"]+)"/);
+    if (nameMatch) result.name = nameMatch[1];
+
+    const addressMatch = markdown.match(/"streetAddress"\s*:\s*"([^"]+)"/);
+    if (addressMatch) result.address = addressMatch[1];
+
+    break;
+  }
+
+  return result;
+}
+
 function extractLeadsFromMarkdown(markdown: string, url: string, niche: string): ExtractedLead[] {
   const leads: ExtractedLead[] = [];
 
-  // Extract only Belgian MOBILE numbers (04x → +324x) — no landlines
-  const mobileRegex = /(?:\+32|0032|0)\s*4[5-9][\d\s\-\.]{6,10}/g;
-  const emailRegex = /[\w.-]+@[\w.-]+\.\w{2,}/g;
+  // First try JSON-LD extraction (most reliable)
+  const jsonLd = extractFromJsonLd(markdown);
+  if (jsonLd.name && jsonLd.phone) {
+    leads.push(createLead(jsonLd.name, jsonLd.phone, jsonLd.email, jsonLd.address, url, niche));
+  }
 
-  // Try to identify business blocks in the content
-  // Look for patterns like: Name + Address + Phone
+  // Strategy 1: Structured listings (directory pages)
   const lines = markdown.split('\n').filter(l => l.trim().length > 0);
-
-  // Strategy 1: Look for structured listings (common in directory pages)
-  // Business names are often in headers or bold text
   const namePatterns = [
-    /^#{1,4}\s+(.+)/,           // Markdown headers
-    /^\*\*(.+?)\*\*/,           // Bold text
-    /^\[(.+?)\]\(http/,         // Links
+    /^#{1,4}\s+(.+)/,
+    /^\*\*(.+?)\*\*/,
+    /^\[(.+?)\]\(http/,
+    /^>\s*\*\*(.+?)\*\*/,          // Blockquote bold
   ];
 
   let currentName: string | null = null;
@@ -92,11 +153,9 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
 
-    // Check for business name
     for (const pattern of namePatterns) {
       const match = line.match(pattern);
       if (match && match[1] && match[1].length > 2 && match[1].length < 80) {
-        // Save previous lead if we have one
         if (currentName && (currentPhone || currentEmail)) {
           leads.push(createLead(currentName, currentPhone, currentEmail, currentAddress, currentWebsite, niche));
         }
@@ -109,25 +168,29 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
       }
     }
 
-    // Extract mobile phone only from current line
-    const mobileMatch = line.match(mobileRegex);
+    // Extract mobile phone only
+    const mobileMatch = line.match(MOBILE_REGEX);
     if (mobileMatch && !currentPhone) {
       currentPhone = mobileMatch[0];
     }
 
-    // Extract email
-    const emailMatch = line.match(emailRegex);
+    const emailMatch = line.match(EMAIL_REGEX);
     if (emailMatch && !currentEmail) {
-      currentEmail = emailMatch[0];
+      const email = emailMatch[0];
+      // Skip common non-personal emails
+      if (!email.match(/^(info|contact|admin|noreply|no-reply|support|hello|office)@/i)) {
+        currentEmail = email;
+      } else if (!currentEmail) {
+        currentEmail = email;
+      }
     }
 
-    // Extract address (Belgian postal codes: 1000-9999)
+    // Belgian postal code
     const addressMatch = line.match(/\d{4}\s+[A-ZÀ-Ü][a-zà-ü]+/);
     if (addressMatch && !currentAddress) {
       currentAddress = line.replace(/^[-–•*]\s*/, '').trim();
     }
 
-    // Extract website
     const urlMatch = line.match(/\[.*?\]\((https?:\/\/[^\s)]+)\)/);
     if (urlMatch && !currentWebsite) {
       currentWebsite = urlMatch[1];
@@ -139,18 +202,24 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
     leads.push(createLead(currentName, currentPhone, currentEmail, currentAddress, currentWebsite, niche));
   }
 
-  // Strategy 2: If no structured leads found, extract all phones from the page
-  // and associate them with the page title/URL
+  // Strategy 2: Bulk extraction if no structured leads
   if (leads.length === 0) {
-    const allEmails = markdown.match(emailRegex) || [];
-    const allMobiles = markdown.match(mobileRegex) || [];
+    const allEmails = markdown.match(EMAIL_REGEX) || [];
+    const allMobiles = markdown.match(MOBILE_REGEX) || [];
 
     const titleMatch = markdown.match(/^#\s+(.+)/m);
     const pageTitle = titleMatch ? titleMatch[1].trim() : new URL(url).hostname.replace(/^www\./, '');
 
     if (allMobiles.length > 0) {
-      const email = allEmails.length > 0 ? allEmails[0] : null;
-      leads.push(createLead(pageTitle, allMobiles[0], email, null, url, niche));
+      // Extract each unique mobile as a potential lead
+      const seenPhones = new Set<string>();
+      for (const mobile of allMobiles) {
+        const cleaned = mobile.replace(/[^\d+]/g, '');
+        if (seenPhones.has(cleaned)) continue;
+        seenPhones.add(cleaned);
+        const email = allEmails.length > 0 ? allEmails[0] : null;
+        leads.push(createLead(pageTitle + (seenPhones.size > 1 ? ` (${seenPhones.size})` : ''), mobile, email, null, url, niche));
+      }
     }
   }
 
@@ -165,9 +234,6 @@ function createLead(
   website: string | null,
   niche: string,
 ): ExtractedLead {
-  // Leads from prospecting always start without score — qualification comes later
-  const score = null;
-
   return {
     company_name: name.substring(0, 100),
     contact_name: null,
@@ -176,7 +242,7 @@ function createLead(
     location: address,
     service_requested: niche,
     space_type: null,
-    score,
+    score: null,
     website,
   };
 }
@@ -189,6 +255,18 @@ function normalizePhone(phone: string): string {
   if (!p.startsWith('32') && p.length <= 9) p = '32' + p;
   return p;
 }
+
+// Normalize company name for dedup (remove legal suffixes, lowercase, trim)
+function normalizeCompanyName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(sprl|bvba|sa|nv|srl|bv|asbl|vzw|scrl)\b/gi, '')
+    .replace(/[^a-zà-üö0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// ==================== MAIN HANDLER ====================
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -251,10 +329,10 @@ Deno.serve(async (req) => {
 
     const searchPromises = allQueries.map(async (query, idx) => {
       try {
-        console.log(`[Sofia] Search query ${idx + 1}: ${query}`);
+        console.log(`[Sofia] Search query ${idx + 1}/${allQueries.length}: ${query}`);
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (firecrawlApiKey) headers['Authorization'] = `Bearer ${firecrawlApiKey}`;
-        
+
         const resp = await fetch(`${firecrawlBaseUrl}/v1/search`, {
           method: 'POST',
           headers,
@@ -307,10 +385,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Deduplicate by company name
+    // Deduplicate by normalized company name
     const seen = new Set<string>();
     const uniqueLeads = allExtractedLeads.filter(l => {
-      const key = l.company_name.toLowerCase().trim();
+      const key = normalizeCompanyName(l.company_name);
       if (!key || key.length < 2 || seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -318,33 +396,26 @@ Deno.serve(async (req) => {
 
     console.log(`[Sofia] Total unique leads from Firecrawl: ${uniqueLeads.length}`);
 
-    if (uniqueLeads.length === 0) {
-      if (runId) {
-        await supabase.from('prospecting_runs').update({
-          status: 'completed', leads_found: 0, leads_qualified: 0,
-          completed_at: new Date().toISOString(),
-        }).eq('id', runId);
-      }
-      return new Response(
-        JSON.stringify({ success: true, leads_found: 0, leads_qualified: 0, leads_inserted: 0 }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // ========== PHASE 2: Deep scrape leads — try multiple contact pages ==========
+    const CONTACT_PATHS = ['/contact', '/contactez-nous', '/kontakt', '/nous-contacter', '/over-ons', '/about', '/a-propos'];
 
-    // ========== PHASE 2: Deep scrape leads with websites but weak contact info ==========
-    const leadsNeedingScrape = uniqueLeads.filter(l => l.website && (!l.score || !l.email));
-    console.log(`[Sofia] ${leadsNeedingScrape.length} leads need deep scraping`);
+    // Scrape ALL leads that have a website — even those with phone, to find mobile if they only have landline
+    const leadsNeedingScrape = uniqueLeads.filter(l => l.website);
+    console.log(`[Sofia] ${leadsNeedingScrape.length} leads will be deep scraped`);
 
-    const scrapePromises = leadsNeedingScrape.slice(0, 20).map(async (lead) => {
+    const scrapePromises = leadsNeedingScrape.slice(0, 30).map(async (lead) => {
       try {
-        const contactUrl = lead.website!.replace(/\/$/, '') + '/contact';
-        const urlsToTry = [contactUrl, lead.website!];
+        const baseUrl = lead.website!.replace(/\/$/, '');
+        const urlsToTry = [
+          ...CONTACT_PATHS.map(p => baseUrl + p),
+          lead.website!,
+        ];
 
         for (const url of urlsToTry) {
           try {
             const scrapeHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
             if (firecrawlApiKey) scrapeHeaders['Authorization'] = `Bearer ${firecrawlApiKey}`;
-            
+
             const resp = await fetch(`${firecrawlBaseUrl}/v1/scrape`, {
               method: 'POST',
               headers: scrapeHeaders,
@@ -356,20 +427,29 @@ Deno.serve(async (req) => {
             const markdown = data.data?.markdown || data.markdown || '';
             if (markdown.length < 50) continue;
 
+            // Try JSON-LD first
+            const jsonLd = extractFromJsonLd(markdown);
+            if (jsonLd.phone && !lead.phone) {
+              lead.phone = jsonLd.phone.replace(/[^\d+]/g, '');
+            }
+            if (jsonLd.email && !lead.email) {
+              lead.email = jsonLd.email;
+            }
+
             // Extract email
-            const emailMatch = markdown.match(/[\w.-]+@[\w.-]+\.\w{2,}/);
+            const emailMatch = markdown.match(EMAIL_REGEX);
             if (emailMatch && !lead.email) {
               lead.email = emailMatch[0];
             }
 
             // Extract Belgian mobile only — no landlines
-            const mobileMatch = markdown.match(/(?:\+32|0032|0)\s*4[5-9][\d\s\-\.]{6,10}/);
+            const mobileMatch = markdown.match(MOBILE_REGEX);
             if (mobileMatch) {
               const cleaned = mobileMatch[0].replace(/[^\d+]/g, '');
               lead.phone = cleaned.startsWith('+') ? cleaned : '+' + cleaned;
               console.log(`[Sofia] ✅ Enriched ${lead.company_name}: mobile ${lead.phone}`);
+              break; // Found mobile, no need to try more pages
             }
-            break;
           } catch { /* try next URL */ }
         }
       } catch (e) {
@@ -383,13 +463,74 @@ Deno.serve(async (req) => {
     }
 
     // ========== PHASE 3: Filter qualified leads ==========
-    // Leads with a Belgian mobile phone qualify for insertion
+    // Only leads with a Belgian MOBILE phone qualify
     const qualifiedLeads = uniqueLeads.filter(l => {
       if (!l.phone) return false;
       const norm = normalizePhone(l.phone);
       return norm.startsWith('324');
     });
-    console.log(`[Sofia] After enrichment — qualified: ${qualifiedLeads.length} (filtered: ${uniqueLeads.length - qualifiedLeads.length})`);
+    console.log(`[Sofia] After enrichment — qualified with mobile: ${qualifiedLeads.length} / ${uniqueLeads.length}`);
+
+    // ========== PHASE 2.5: FALLBACK — if not enough leads, expand to nearby regions ==========
+    if (qualifiedLeads.length < maxLeads) {
+      console.log(`[Sofia] ⚠️ Only ${qualifiedLeads.length} qualified leads, need ${maxLeads}. Expanding search...`);
+
+      // Pick 3 nearby regions not already searched
+      const extraRegions = BELGIAN_REGIONS
+        .filter(r => r.toLowerCase() !== searchRegion.toLowerCase())
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3);
+
+      for (const extraRegion of extraRegions) {
+        if (qualifiedLeads.length >= maxLeads) break;
+
+        console.log(`[Sofia] Expanding to region: ${extraRegion}`);
+        const extraQueries = generateSearchQueries(searchNiche, extraRegion).slice(0, 4); // Limit to 4 queries per extra region
+
+        for (const query of extraQueries) {
+          try {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+            if (firecrawlApiKey) headers['Authorization'] = `Bearer ${firecrawlApiKey}`;
+
+            const resp = await fetch(`${firecrawlBaseUrl}/v1/search`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ query, limit: 10, lang: 'fr', country: 'be', scrapeOptions: { formats: ['markdown'] } }),
+            });
+
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            const results = data.data || [];
+
+            for (const result of results) {
+              const markdown = result.markdown || '';
+              const url = result.url || '';
+              if (markdown.length < 50) continue;
+
+              const extracted = extractLeadsFromMarkdown(markdown, url, searchNiche);
+              for (const lead of extracted) {
+                const key = normalizeCompanyName(lead.company_name);
+                if (!key || key.length < 2 || seen.has(key)) continue;
+                seen.add(key);
+
+                // Only add if has mobile
+                if (lead.phone) {
+                  const norm = normalizePhone(lead.phone);
+                  if (norm.startsWith('324')) {
+                    qualifiedLeads.push(lead);
+                    uniqueLeads.push(lead);
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.error(`[Sofia] Fallback search error:`, e);
+          }
+        }
+      }
+
+      console.log(`[Sofia] After fallback expansion — qualified: ${qualifiedLeads.length}`);
+    }
 
     // ========== PHASE 4: WhatsApp verification + insertion ==========
     const evoUrl = Deno.env.get('EVOLUTION_API_URL');
@@ -401,7 +542,6 @@ Deno.serve(async (req) => {
       console.log('[Sofia] Evolution API not configured — skipping WhatsApp verification');
     }
 
-    // Returns: 'verified' (exists on WhatsApp), 'not_found', or 'error' (API issue)
     async function checkWhatsApp(phone: string): Promise<'verified' | 'not_found' | 'error'> {
       if (!canCheckWhatsApp) return 'verified';
       const number = normalizePhone(phone);
@@ -426,31 +566,62 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Also check for duplicates by phone number (not just company name)
+    const existingPhones = new Set<string>();
+    if (qualifiedLeads.length > 0) {
+      const phonesToCheck = qualifiedLeads.map(l => normalizePhone(l.phone!));
+      // Batch check existing phones in DB
+      const { data: existingLeads } = await supabase
+        .from('leads')
+        .select('phone, whatsapp_number')
+        .or(phonesToCheck.map(p => `phone.ilike.%${p.slice(-8)}%`).join(','));
+
+      if (existingLeads) {
+        for (const el of existingLeads) {
+          if (el.phone) existingPhones.add(normalizePhone(el.phone));
+          if (el.whatsapp_number) existingPhones.add(el.whatsapp_number);
+        }
+      }
+    }
+
     let leadsInserted = 0;
     let leadsWhatsAppVerified = 0;
+    let leadsSkippedDuplicate = 0;
+    let leadsSkippedNoWhatsApp = 0;
 
-    const leadsToProcess = qualifiedLeads.slice(0, maxLeads);
+    const leadsToProcess = qualifiedLeads.slice(0, maxLeads * 2); // Process more to account for skips
 
     for (const lead of leadsToProcess) {
+      if (leadsInserted >= maxLeads) break;
+
       if (!lead.company_name || lead.company_name.length < 2) continue;
       if (!lead.phone || lead.phone.trim().length < 5) continue;
 
-      // Final guard: only insert if normalized phone starts with 324 (Belgian mobile)
+      // Final guard: only Belgian mobile
       const normalizedCheck = normalizePhone(lead.phone);
       if (!normalizedCheck.startsWith('324')) {
-        console.log(`[Sofia] Skipping ${lead.company_name}: phone ${normalizedCheck} is not a Belgian mobile`);
         continue;
       }
 
-      // Check if already exists
+      // Check phone dedup
+      if (existingPhones.has(normalizedCheck)) {
+        leadsSkippedDuplicate++;
+        continue;
+      }
+
+      // Check if company already exists
       const { data: existing } = await supabase
         .from('leads')
         .select('id')
         .ilike('company_name', lead.company_name)
         .limit(1);
 
-      if (existing && existing.length > 0) continue;
+      if (existing && existing.length > 0) {
+        leadsSkippedDuplicate++;
+        continue;
+      }
 
+      // WhatsApp verification
       const normalized = normalizePhone(lead.phone);
       let whatsappNumber: string | null = null;
 
@@ -460,17 +631,20 @@ Deno.serve(async (req) => {
           whatsappNumber = normalized;
           leadsWhatsAppVerified++;
         } else if (result === 'not_found') {
-          console.log(`[Sofia] Skipping ${lead.company_name}: phone ${normalized} not on WhatsApp`);
+          leadsSkippedNoWhatsApp++;
+          console.log(`[Sofia] Skipping ${lead.company_name}: ${normalized} not on WhatsApp`);
           continue;
         } else {
-          // API error — insert lead anyway without WhatsApp verification
-          whatsappNumber = null;
+          // API error — skip to be safe (only WhatsApp verified leads)
+          console.log(`[Sofia] Skipping ${lead.company_name}: WhatsApp check error`);
+          continue;
         }
       } else {
         whatsappNumber = normalized;
       }
 
-      const whatsappVerified = whatsappNumber !== null;
+      existingPhones.add(normalized); // Prevent inserting same phone twice in this run
+
       const { error: insertError } = await supabase.from('leads').insert({
         contact_name: lead.contact_name || null,
         company_name: lead.company_name,
@@ -480,12 +654,12 @@ Deno.serve(async (req) => {
         location: lead.location || null,
         space_type: lead.space_type || null,
         service_requested: searchNiche,
-        score: lead.score || null,
+        score: null,
         status: 'new',
         source: 'prospecting',
         active_agent: 'sophie',
         language: 'fr',
-        notes: `[Sofia] Niche: ${searchNiche} | Região: ${searchRegion} | Source: Firecrawl Search${whatsappVerified ? ' | ✅ WhatsApp vérifié' : ' | ⚠️ WhatsApp non vérifié'}`,
+        notes: `[Sofia] Niche: ${searchNiche} | Région: ${searchRegion} | Source: Firecrawl Search${whatsappNumber ? ' | ✅ WhatsApp vérifié' : ''}`,
       });
 
       if (!insertError) {
@@ -508,10 +682,10 @@ Deno.serve(async (req) => {
     await supabase.from('activity_log').insert({
       type: 'prospecting',
       title: `Sofia — ${leadsInserted} leads prospectés`,
-      description: `Niche: ${searchNiche} | Région: ${searchRegion} | Firecrawl: ${uniqueLeads.length} | HOT+WARM: ${qualifiedLeads.length} | Insérés: ${leadsInserted} | WhatsApp: ${leadsWhatsAppVerified}`,
+      description: `Niche: ${searchNiche} | Région: ${searchRegion} | Trouvés: ${uniqueLeads.length} | Mobiles: ${qualifiedLeads.length} | Insérés: ${leadsInserted} | WhatsApp: ${leadsWhatsAppVerified} | Duplicatas: ${leadsSkippedDuplicate} | Sans WhatsApp: ${leadsSkippedNoWhatsApp}`,
     });
 
-    console.log(`[Sofia] Done — Firecrawl: ${uniqueLeads.length}, HOT+WARM: ${qualifiedLeads.length}, Inserted: ${leadsInserted}, WhatsApp: ${leadsWhatsAppVerified}`);
+    console.log(`[Sofia] ✅ Done — Found: ${uniqueLeads.length}, Mobiles: ${qualifiedLeads.length}, Inserted: ${leadsInserted}, WhatsApp: ${leadsWhatsAppVerified}, Duplicates: ${leadsSkippedDuplicate}, No WhatsApp: ${leadsSkippedNoWhatsApp}`);
 
     return new Response(
       JSON.stringify({
@@ -520,6 +694,8 @@ Deno.serve(async (req) => {
         leads_qualified: qualifiedLeads.length,
         leads_inserted: leadsInserted,
         leads_whatsapp_verified: leadsWhatsAppVerified,
+        leads_skipped_duplicate: leadsSkippedDuplicate,
+        leads_skipped_no_whatsapp: leadsSkippedNoWhatsApp,
         run_id: runId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
