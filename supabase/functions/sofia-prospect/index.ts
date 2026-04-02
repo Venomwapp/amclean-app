@@ -165,17 +165,8 @@ function createLead(
   website: string | null,
   niche: string,
 ): ExtractedLead {
-  // Only mobile numbers (+324x) are accepted — they're always HOT
-  let score: 'HOT' | 'WARM' | 'COLD' = 'COLD';
-
-  if (phone) {
-    const cleaned = phone.replace(/[^\d+]/g, '');
-    const normalized = cleaned.replace(/^\+/, '').replace(/^00/, '').replace(/^0/, '32');
-    if (normalized.match(/^324[5-9]/)) {
-      score = 'HOT';
-    }
-    // No WARM for landlines — they are filtered out entirely
-  }
+  // Leads from prospecting always start without score — qualification comes later
+  const score: 'HOT' | 'WARM' | 'COLD' = 'COLD';
 
   return {
     company_name: name.substring(0, 100),
@@ -376,7 +367,6 @@ Deno.serve(async (req) => {
             if (mobileMatch) {
               const cleaned = mobileMatch[0].replace(/[^\d+]/g, '');
               lead.phone = cleaned.startsWith('+') ? cleaned : '+' + cleaned;
-              lead.score = 'HOT';
               console.log(`[Sofia] ✅ Enriched ${lead.company_name}: mobile ${lead.phone}`);
             }
             break;
@@ -393,9 +383,13 @@ Deno.serve(async (req) => {
     }
 
     // ========== PHASE 3: Filter qualified leads ==========
-    // Only HOT leads (mobile numbers) qualify now
-    const qualifiedLeads = uniqueLeads.filter(l => l.score === 'HOT');
-    console.log(`[Sofia] After enrichment — HOT+WARM: ${qualifiedLeads.length} (COLD filtered: ${uniqueLeads.length - qualifiedLeads.length})`);
+    // Leads with a Belgian mobile phone qualify for insertion
+    const qualifiedLeads = uniqueLeads.filter(l => {
+      if (!l.phone) return false;
+      const norm = normalizePhone(l.phone);
+      return norm.startsWith('324');
+    });
+    console.log(`[Sofia] After enrichment — qualified: ${qualifiedLeads.length} (filtered: ${uniqueLeads.length - qualifiedLeads.length})`);
 
     // ========== PHASE 4: WhatsApp verification + insertion ==========
     const evoUrl = Deno.env.get('EVOLUTION_API_URL');
