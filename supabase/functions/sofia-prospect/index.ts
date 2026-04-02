@@ -13,7 +13,7 @@ interface ExtractedLead {
   location: string | null;
   service_requested: string | null;
   space_type: string | null;
-  score: 'HOT' | 'WARM' | 'COLD';
+  score: 'HOT' | 'WARM' | 'COLD' | null;
   website: string | null;
 }
 
@@ -166,7 +166,7 @@ function createLead(
   niche: string,
 ): ExtractedLead {
   // Leads from prospecting always start without score — qualification comes later
-  const score: 'HOT' | 'WARM' | 'COLD' = 'COLD';
+  const score = null;
 
   return {
     company_name: name.substring(0, 100),
@@ -332,7 +332,7 @@ Deno.serve(async (req) => {
     }
 
     // ========== PHASE 2: Deep scrape leads with websites but weak contact info ==========
-    const leadsNeedingScrape = uniqueLeads.filter(l => l.website && (l.score === 'COLD' || !l.email));
+    const leadsNeedingScrape = uniqueLeads.filter(l => l.website && (!l.score || !l.email));
     console.log(`[Sofia] ${leadsNeedingScrape.length} leads need deep scraping`);
 
     const scrapePromises = leadsNeedingScrape.slice(0, 20).map(async (lead) => {
@@ -480,7 +480,7 @@ Deno.serve(async (req) => {
         location: lead.location || null,
         space_type: lead.space_type || null,
         service_requested: searchNiche,
-        score: lead.score || 'WARM',
+        score: lead.score || null,
         status: 'new',
         source: 'prospecting',
         active_agent: 'sophie',
