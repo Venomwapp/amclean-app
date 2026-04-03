@@ -154,22 +154,22 @@ async function fetchAudioBase64(messageId: string, remoteJid: string): Promise<s
   }
 }
 
-// Transcribe audio using Gemini via Lovable AI gateway
+// Transcribe audio using Gemini API
 async function transcribeAudio(audioBase64: string): Promise<string | null> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) {
-    console.error("[Webhook] LOVABLE_API_KEY not configured for transcription");
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) {
+    console.error("[Webhook] GEMINI_API_KEY not configured for transcription");
     return null;
   }
   try {
-    const resp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const resp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.5-flash",
         temperature: 0.1,
         max_tokens: 1000,
         messages: [
@@ -540,10 +540,10 @@ serve(async (req) => {
 
     const systemPrompt = agentConfig.system_prompt + dateContext + leadContext;
 
-    // Step 5: Call LLM via Lovable AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("[Webhook] LOVABLE_API_KEY not configured");
+    // Step 5: Call LLM via Gemini API
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      console.error("[Webhook] GEMINI_API_KEY not configured");
       return new Response(JSON.stringify({ status: "error", message: "LLM not configured" }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -560,14 +560,14 @@ serve(async (req) => {
 
     console.log("[Webhook] Calling LLM with", llmMessages.length, "messages");
 
-    const llmResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const llmResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.5-flash",
         temperature: agentConfig.temperature ?? 0.3,
         max_tokens: agentConfig.max_tokens ?? 500,
         messages: llmMessages,
@@ -613,20 +613,8 @@ serve(async (req) => {
       Object.assign(leadUpdates, leadDataFields);
     }
 
-    // AUTO-TRANSFER: If Sophie collected enough LEAD_DATA (area + frequency + timeline), 
-    // force transfer to Claire even if LLM forgot [TRANSFER:claire]
+    // Parse transfer tag from LLM response
     let transferTo = parseTransfer(rawResponse);
-    if (!transferTo && lead.active_agent === "sophie" && tagsDetected.includes("LEAD_DATA")) {
-      const mergedLead = { ...lead, ...leadUpdates };
-      const hasArea = !!(mergedLead.surface_area && mergedLead.surface_area !== "non précisée");
-      const hasFrequency = !!(mergedLead.frequency && mergedLead.frequency !== "non précisée");
-      const hasTimeline = !!(mergedLead.timeline && mergedLead.timeline !== "non précisé");
-      if (hasArea && hasFrequency && hasTimeline) {
-        console.log("[Webhook] Sophie qualified lead with sufficient data — forcing auto-transfer to Claire");
-        transferTo = "claire";
-        tagsDetected.push("AUTO_TRANSFER");
-      }
-    }
 
     // Parse SCHEDULING_REQUEST → create appointment
     const scheduling = parseSchedulingRequest(rawResponse);
@@ -709,11 +697,28 @@ serve(async (req) => {
         type: scheduling.type === "call" ? "call" : "visit",
         datetime: appointmentDatetime || null,
         status: "scheduled",
-        location: lead.location || lead.address || null,
-        notes: `RDV confirmé via WhatsApp — ${lead.contact_name || lead.whatsapp_number || "Client"} (${lead.company_name || ""})`,
+        location: leadUpdates.address || lead.address || lead.location || null,
+        notes: `RDV confirmé via WhatsApp — ${leadUpdates.contact_name || lead.contact_name || lead.whatsapp_number || "Client"} (${lead.company_name || ""})`,
       };
       if (appointmentData.datetime) {
-        const { data: insertedAppt, error: apptErr } = await supabaseAdmin.from("appointments").insert(appointmentData).select("id").single();
+        // Check for scheduling conflicts (±1 hour)
+        const apptTime = new Date(appointmentData.datetime);
+        const oneHourBefore = new Date(apptTime.getTime() - 60 * 60 * 1000).toISOString();
+        const oneHourAfter = new Date(apptTime.getTime() + 60 * 60 * 1000).toISOString();
+        const { data: conflicting } = await supabaseAdmin
+          .from("appointments")
+          .select("id, datetime")
+          .in("status", ["scheduled", "confirmed"])
+          .gte("datetime", oneHourBefore)
+          .lte("datetime", oneHourAfter)
+          .limit(1);
+        if (conflicting && conflicting.length > 0) {
+          console.log("[Webhook] Scheduling conflict detected at", appointmentData.datetime, "— existing appointment:", conflicting[0].id);
+          // Don't create, the LLM should propose another slot
+        }
+        const { data: insertedAppt, error: apptErr } = conflicting && conflicting.length > 0
+          ? { data: null, error: { message: "Conflict" } }
+          : await supabaseAdmin.from("appointments").insert(appointmentData).select("id").single();
         if (apptErr) {
           console.error("[Webhook] Appointment insert error:", apptErr.message);
         } else {
@@ -798,14 +803,14 @@ serve(async (req) => {
               : `Tu viens de reprendre ce lead suite à un transfert interne. Envoie ton premier message maintenant — présente-toi et continue le processus naturellement selon ton rôle. Le client ne doit PAS savoir qu'il y a eu un transfert.` },
           ];
 
-          const transferLlmResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          const transferLlmResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              Authorization: `Bearer ${GEMINI_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "google/gemini-2.5-flash",
+              model: "gemini-2.5-flash",
               temperature: newAgentConfig.temperature ?? 0.3,
               max_tokens: newAgentConfig.max_tokens ?? 500,
               messages: transferMessages,

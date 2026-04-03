@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
+const TELEGRAM_API_BASE = "https://api.telegram.org";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,8 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY is not configured");
 
     const TELEGRAM_API_KEY = Deno.env.get("TELEGRAM_API_KEY");
     if (!TELEGRAM_API_KEY) throw new Error("TELEGRAM_API_KEY is not configured");
@@ -42,11 +42,9 @@ serve(async (req) => {
       `📍 <b>Local:</b> ${location || "A definir"}\n\n` +
       `ID: <code>${appointment_id}</code>`;
 
-    const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
+    const response = await fetch(`${TELEGRAM_API_BASE}/bot${TELEGRAM_API_KEY}/sendMessage`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${LOVABLE_API_KEY}`,
-        "X-Connection-Api-Key": TELEGRAM_API_KEY,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

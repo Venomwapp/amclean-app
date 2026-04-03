@@ -191,18 +191,6 @@ const AdminLogin = () => {
             </motion.button>
           </motion.form>
 
-          {/* Quick access */}
-          <motion.button
-            type="button"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            onClick={() => { setEmail('admin@amclean.be'); setPassword('AMclean123'); }}
-            className="w-full mt-4 py-2.5 rounded-xl border border-white/10 text-[10px] uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground hover:border-accent/30 transition-all duration-300"
-          >
-            ⚡ Acesso rápido Admin
-          </motion.button>
-
           {/* Footer */}
           <motion.p 
             initial={{ opacity: 0 }}

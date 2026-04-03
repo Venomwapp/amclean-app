@@ -686,7 +686,7 @@ Deno.serve(async (req) => {
         score: null,
         status: 'new',
         source: 'prospecting',
-        active_agent: 'sophie',
+        active_agent: 'claire',
         language: 'fr',
         notes: `[Sofia] Niche: ${searchNiche} | Région: ${searchRegion} | Source: Firecrawl Search`,
       });

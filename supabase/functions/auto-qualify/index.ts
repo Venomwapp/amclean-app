@@ -38,7 +38,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Check daily limit: max 40 qualification messages per day (Brussels timezone)
@@ -71,7 +71,7 @@ serve(async (req) => {
       .eq("status", "new")
       .not("whatsapp_number", "is", null)
       .neq("source", "prospecting")
-      .neq("active_agent", "sophie")
+      .neq("source", "prospecting")
       .order("created_at", { ascending: true })
       .limit(10);
 
@@ -208,16 +208,16 @@ INSTRUCTIONS :
       { role: "user", content: generatePrompts[lang] || generatePrompts.fr },
     ];
 
-    const llmResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const llmResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
+        Authorization: `Bearer ${geminiApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.5-flash",
         temperature: agentConfig.temperature ?? 0.4,
-        max_tokens: 300,
+        max_tokens: 1024,
         messages: llmMessages,
       }),
     });

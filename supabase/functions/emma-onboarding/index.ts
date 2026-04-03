@@ -79,22 +79,22 @@ serve(async (req) => {
     // Build onboarding prompt
     const leadContext = `\n\nDONNÉES DU CLIENT :\n- Nom: ${lead.contact_name || "inconnu"}\n- Entreprise: ${lead.company_name || "inconnue"}\n- Service: ${lead.service_requested || "non précisé"}\n- Localisation: ${lead.location || lead.address || "inconnue"}\n- Fréquence: ${lead.frequency || "non précisée"}\n- Langue: ${lead.language || "fr"}\n\nCONTEXTE: C'est le premier contact post-conversion. Le client vient de signer son contrat. Envoie un message d'onboarding chaleureux.`;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(JSON.stringify({ error: "LOVABLE_API_KEY not configured" }), {
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      return new Response(JSON.stringify({ error: "GEMINI_API_KEY not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const llmResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const llmResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.5-flash",
         temperature: emmaConfig.temperature ?? 0.4,
         max_tokens: emmaConfig.max_tokens ?? 600,
         messages: [

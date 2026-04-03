@@ -28,7 +28,11 @@ const Conversations = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const fetchLeads = async () => {
-    const { data } = await supabase.from('leads').select('id, contact_name, company_name, whatsapp_number, active_agent, status').order('updated_at', { ascending: false });
+    // Only fetch leads that have at least one conversation (message sent)
+    const { data: convLeadIds } = await supabase.from('conversations').select('lead_id');
+    if (!convLeadIds || convLeadIds.length === 0) { setLeads([]); return; }
+    const uniqueIds = [...new Set(convLeadIds.map(c => c.lead_id).filter(Boolean))];
+    const { data } = await supabase.from('leads').select('id, contact_name, company_name, whatsapp_number, active_agent, status').in('id', uniqueIds).order('updated_at', { ascending: false });
     if (data) setLeads(data);
   };
 
