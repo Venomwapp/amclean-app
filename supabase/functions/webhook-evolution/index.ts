@@ -534,11 +534,18 @@ serve(async (req) => {
     const now = new Date();
     const dayNames = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
     const monthNames = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-    const dateContext = `\n\nDATE ACTUELLE : ${dayNames[now.getDay()]} ${now.getDate()} ${monthNames[now.getMonth()]} ${now.getFullYear()}, ${now.getHours()}h${String(now.getMinutes()).padStart(2, "0")} (heure de Belgique).`;
+    // Use proper Brussels time (not server UTC)
+    const brusselsFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+    const brusselsParts = brusselsFmt.formatToParts(now);
+    const bPart = (type: string) => brusselsParts.find(p => p.type === type)?.value || "";
+    const brusselsDayName = dayNames[new Date(now.toLocaleString("en-US", { timeZone: "Europe/Brussels" })).getDay()];
+    const brusselsMonthName = monthNames[new Date(now.toLocaleString("en-US", { timeZone: "Europe/Brussels" })).getMonth()];
+    const dateContext = `\n\nDATE ACTUELLE : ${brusselsDayName} ${bPart("day")} ${brusselsMonthName} ${bPart("year")}, ${bPart("hour")}h${bPart("minute")} (heure de Belgique).`;
     
     const leadContext = `\n\nDONNÉES CONNUES SUR CE LEAD :\n- Nom: ${lead.contact_name || "inconnu"}\n- Entreprise: ${lead.company_name || "inconnue"}\n- Service demandé: ${lead.service_requested || "non précisé"}\n- Localisation: ${lead.location || "inconnue"}\n- Adresse: ${lead.address || "non précisée"}\n- Surface: ${lead.surface_area || "non précisée"}\n- Fréquence: ${lead.frequency || "non précisée"}\n- Timeline: ${lead.timeline || "non précisé"}\n- Score: ${lead.score || "non évalué"}\n- Langue détectée: ${lead.language || "fr"}${npsInfo}\n(Ne redemande pas les informations déjà connues.)`;
 
-    const systemPrompt = agentConfig.system_prompt + dateContext + leadContext;
+    const schedulingRules = `\n\nRÈGLES D'AGENDA :\n- Quand le client propose un horaire, UTILISE EXACTEMENT cet horaire dans ta réponse et dans le tag [SCHEDULING_REQUEST].\n- Ne change JAMAIS l'heure proposée par le client (ex: s'il dit "10h", confirme 10h, pas 11h).\n- Si le client dit "demain", c'est le jour suivant la date actuelle.\n- Si le client dit un jour de la semaine (ex: "lundi"), c'est le prochain lundi à venir.\n- Répète toujours la date et l'heure dans ta confirmation pour que le client valide.`;
+    const systemPrompt = agentConfig.system_prompt + dateContext + schedulingRules + leadContext;
 
     // Step 5: Call LLM via Gemini API
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -623,69 +630,113 @@ serve(async (req) => {
       if (scheduling.score) leadUpdates.score = scheduling.score;
       leadUpdates.status = "scheduled";
 
-      // Try to extract datetime from the conversation context
-      // Brussels timezone offset (CET=+1, CEST=+2)
+      // Brussels timezone offset: compute dynamically
       const brusselsNow = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Brussels" }));
-      const brusselsOffset = (brusselsNow.getTimezoneOffset() === 0) ? 1 : (now.getMonth() >= 2 && now.getMonth() <= 9) ? 2 : 1; // simplified CET/CEST
+      const brusselsOffset = Math.round((brusselsNow.getTime() - now.getTime()) / 3600000 + (now.getTimezoneOffset() / 60));
+      console.log(`[Webhook] Brussels offset: UTC+${brusselsOffset}, Brussels time: ${brusselsNow.toISOString()}`);
 
-      // Try full date pattern first: "10 mars à 14h00"
-      const dateMatch = rawResponse.match(/(\d{1,2})\s+(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+(?:à\s+)?(\d{1,2})[h:]?(\d{0,2})/i);
-      // Try relative date patterns: "aujourd'hui à 14h", "demain à 10h"
-      const relativeMatch = !dateMatch ? rawResponse.match(/(?:aujourd['']?hui|today|vandaag|hoje)\s+(?:à\s+)?(\d{1,2})[h:](\d{0,2})/i) : null;
-      const tomorrowMatch = !dateMatch && !relativeMatch ? rawResponse.match(/(?:demain|tomorrow|morgen|amanhã)\s+(?:à\s+)?(\d{1,2})[h:](\d{0,2})/i) : null;
-      // Try just time pattern: "à 14h00", "at 14:00"
-      const timeOnlyMatch = !dateMatch && !relativeMatch && !tomorrowMatch ? rawResponse.match(/(?:à|at|om|às)\s+(\d{1,2})[h:](\d{0,2})/i) : null;
+      // Extract date/time from BOTH user message AND LLM response (prefer user's request)
+      const textSources = [messageText, rawResponse];
+
+      const tryParseDate = (text: string): { type: string; match: RegExpMatchArray } | null => {
+        // Full date: "10 mars à 14h00" or "10 abril às 14h"
+        const full = text.match(/(\d{1,2})\s+(?:de\s+)?(janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+(?:à|às|at|om|a las)?\s*(\d{1,2})[h:]?(\d{0,2})/i);
+        if (full) return { type: "full", match: full };
+        // Relative: "hoje às 14h", "aujourd'hui à 14h"
+        const today = text.match(/(?:aujourd['']?hui|today|vandaag|hoje)\s+(?:à|às|at|om)?\s*(\d{1,2})[h:](\d{0,2})/i);
+        if (today) return { type: "today", match: today };
+        // Tomorrow: "amanhã às 10h", "demain à 10h"
+        const tomorrow = text.match(/(?:demain|tomorrow|morgen|amanhã)\s+(?:à|às|at|om)?\s*(\d{1,2})[h:]?(\d{0,2})/i);
+        if (tomorrow) return { type: "tomorrow", match: tomorrow };
+        // Day of week + time: "segunda às 10h", "lundi à 10h"
+        const weekday = text.match(/(?:segunda|terça|quarta|quinta|sexta|sábado|domingo|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:à|às|at|om|a las)?\s*(\d{1,2})[h:]?(\d{0,2})/i);
+        if (weekday) return { type: "weekday", match: weekday };
+        // Time only: "às 14h", "à 10h"
+        const timeOnly = text.match(/(?:à|às|at|om)\s+(\d{1,2})[h:](\d{0,2})/i);
+        if (timeOnly) return { type: "time_only", match: timeOnly };
+        return null;
+      };
+
+      // Try user message first, then LLM response
+      let parsedDate = tryParseDate(textSources[0]) || tryParseDate(textSources[1]);
+      console.log(`[Webhook] Date parsing: source=${parsedDate ? (tryParseDate(textSources[0]) ? "user_message" : "llm_response") : "none"}, type=${parsedDate?.type || "none"}`);
+
+      const monthMap: Record<string, number> = {
+        janeiro: 0, fevereiro: 1, "março": 2, abril: 3, maio: 4, junho: 5,
+        julho: 6, agosto: 7, setembro: 8, outubro: 9, novembro: 10, dezembro: 11,
+        janvier: 0, "février": 1, mars: 2, "avril": 3, mai: 4, juin: 5,
+        juillet: 6, "août": 7, septembre: 8, octobre: 9, novembre: 10, "décembre": 11,
+        january: 0, february: 1, march: 2, april: 3, may: 4, june: 5,
+        july: 6, august: 7, september: 8, october: 9, november: 10, december: 11,
+      };
+
+      const weekdayMap: Record<string, number> = {
+        domingo: 0, segunda: 1, "terça": 2, quarta: 3, quinta: 4, sexta: 5, "sábado": 6,
+        dimanche: 0, lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6,
+        sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
+      };
 
       let appointmentDatetime: string | null = null;
 
-      if (dateMatch) {
-        const day = parseInt(dateMatch[1]);
-        const monthNames: Record<string, number> = {
-          janvier: 0, january: 0, février: 1, february: 1, mars: 2, march: 2, avril: 3, april: 3,
-          mai: 4, may: 4, juin: 5, june: 5, juillet: 6, july: 6, août: 7, august: 7,
-          septembre: 8, september: 8, octobre: 9, october: 9, novembre: 10, november: 10, décembre: 11, december: 11,
+      if (parsedDate) {
+        const m = parsedDate.match;
+        const makeUtcDate = (year: number, month: number, day: number, hour: number, minute: number) => {
+          const utcHour = hour - brusselsOffset;
+          return new Date(Date.UTC(year, month, day, utcHour, minute));
         };
-        const month = monthNames[dateMatch[2].toLowerCase()] ?? 0;
-        const hour = parseInt(dateMatch[3]);
-        const minute = parseInt(dateMatch[4] || "0");
-        const year = brusselsNow.getFullYear();
-        // Create as Brussels time → convert to UTC
-        const utcHour = hour - brusselsOffset;
-        const dt = new Date(Date.UTC(year, month, day, utcHour, minute));
-        if (dt < now) dt.setFullYear(year + 1);
-        appointmentDatetime = dt.toISOString();
-        console.log(`[Webhook] Parsed full date: ${day}/${month + 1} ${hour}h${minute} Brussels → ${appointmentDatetime}`);
-      } else if (relativeMatch) {
-        // Today + time
-        const hour = parseInt(relativeMatch[1]);
-        const minute = parseInt(relativeMatch[2] || "0");
-        const utcHour = hour - brusselsOffset;
-        const dt = new Date(Date.UTC(brusselsNow.getFullYear(), brusselsNow.getMonth(), brusselsNow.getDate(), utcHour, minute));
-        appointmentDatetime = dt.toISOString();
-        console.log(`[Webhook] Parsed 'today' date: ${hour}h${minute} Brussels → ${appointmentDatetime}`);
-      } else if (tomorrowMatch) {
-        const hour = parseInt(tomorrowMatch[1]);
-        const minute = parseInt(tomorrowMatch[2] || "0");
-        const utcHour = hour - brusselsOffset;
-        const tomorrow = new Date(brusselsNow);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        const dt = new Date(Date.UTC(tomorrow.getFullYear(), tomorrow.getMonth(), tomorrow.getDate(), utcHour, minute));
-        appointmentDatetime = dt.toISOString();
-        console.log(`[Webhook] Parsed 'tomorrow' date: ${hour}h${minute} Brussels → ${appointmentDatetime}`);
-      } else if (timeOnlyMatch) {
-        // Time only → assume today
-        const hour = parseInt(timeOnlyMatch[1]);
-        const minute = parseInt(timeOnlyMatch[2] || "0");
-        const utcHour = hour - brusselsOffset;
-        const dt = new Date(Date.UTC(brusselsNow.getFullYear(), brusselsNow.getMonth(), brusselsNow.getDate(), utcHour, minute));
-        // If time already passed today, assume tomorrow
-        if (dt < now) dt.setDate(dt.getDate() + 1);
-        appointmentDatetime = dt.toISOString();
-        console.log(`[Webhook] Parsed time-only: ${hour}h${minute} Brussels → ${appointmentDatetime}`);
+
+        if (parsedDate.type === "full") {
+          const day = parseInt(m[1]);
+          const month = monthMap[m[2].toLowerCase()] ?? 0;
+          const hour = parseInt(m[3]);
+          const minute = parseInt(m[4] || "0");
+          const dt = makeUtcDate(brusselsNow.getFullYear(), month, day, hour, minute);
+          if (dt < now) dt.setFullYear(dt.getFullYear() + 1);
+          appointmentDatetime = dt.toISOString();
+          console.log(`[Webhook] Parsed full date: ${day}/${month + 1} ${hour}h${minute} Brussels → ${appointmentDatetime}`);
+        } else if (parsedDate.type === "today") {
+          const hour = parseInt(m[1]);
+          const minute = parseInt(m[2] || "0");
+          const dt = makeUtcDate(brusselsNow.getFullYear(), brusselsNow.getMonth(), brusselsNow.getDate(), hour, minute);
+          appointmentDatetime = dt.toISOString();
+          console.log(`[Webhook] Parsed 'today': ${hour}h${minute} Brussels → ${appointmentDatetime}`);
+        } else if (parsedDate.type === "tomorrow") {
+          const hour = parseInt(m[1]);
+          const minute = parseInt(m[2] || "0");
+          const tmr = new Date(brusselsNow);
+          tmr.setDate(tmr.getDate() + 1);
+          const dt = makeUtcDate(tmr.getFullYear(), tmr.getMonth(), tmr.getDate(), hour, minute);
+          appointmentDatetime = dt.toISOString();
+          console.log(`[Webhook] Parsed 'tomorrow': ${hour}h${minute} Brussels → ${appointmentDatetime}`);
+        } else if (parsedDate.type === "weekday") {
+          const hour = parseInt(m[1]);
+          const minute = parseInt(m[2] || "0");
+          // Find the weekday name from the original text
+          const wdMatch = (tryParseDate(textSources[0]) || tryParseDate(textSources[1]))!.match[0];
+          const wdName = wdMatch.match(/(?:segunda|terça|quarta|quinta|sexta|sábado|domingo|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i)?.[0]?.toLowerCase();
+          const targetDay = wdName ? (weekdayMap[wdName] ?? -1) : -1;
+          if (targetDay >= 0) {
+            const currentDay = brusselsNow.getDay();
+            let daysAhead = targetDay - currentDay;
+            if (daysAhead <= 0) daysAhead += 7; // next week
+            const target = new Date(brusselsNow);
+            target.setDate(target.getDate() + daysAhead);
+            const dt = makeUtcDate(target.getFullYear(), target.getMonth(), target.getDate(), hour, minute);
+            appointmentDatetime = dt.toISOString();
+            console.log(`[Webhook] Parsed weekday '${wdName}': +${daysAhead}d ${hour}h${minute} Brussels → ${appointmentDatetime}`);
+          }
+        } else if (parsedDate.type === "time_only") {
+          const hour = parseInt(m[1]);
+          const minute = parseInt(m[2] || "0");
+          const dt = makeUtcDate(brusselsNow.getFullYear(), brusselsNow.getMonth(), brusselsNow.getDate(), hour, minute);
+          if (dt < now) dt.setDate(dt.getDate() + 1);
+          appointmentDatetime = dt.toISOString();
+          console.log(`[Webhook] Parsed time-only: ${hour}h${minute} Brussels → ${appointmentDatetime}`);
+        }
       }
 
       if (!appointmentDatetime) {
-        console.log("[Webhook] Could not parse date from LLM response, using context date if available");
+        console.log("[Webhook] Could not parse date from user message or LLM response");
       }
 
       // Create appointment entry only if we have a valid datetime
