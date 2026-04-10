@@ -237,19 +237,17 @@ async function handleProspectingReport(supabase: any, telegramKey: string, chatI
   const startOfToday = new Date(brusselsNow.getFullYear(), brusselsNow.getMonth(), brusselsNow.getDate()).toISOString();
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-  // 1. Active niche (next in rotation)
-  const { data: activeConfig } = await supabase
+  // 1. All active niches (ordered by rotation: oldest last_run_at first = next to prospect)
+  const { data: activeConfigs } = await supabase
     .from("prospecting_configs")
     .select("niche, region, max_leads_per_run, last_run_at")
     .eq("is_active", true)
-    .order("last_run_at", { ascending: true, nullsFirst: true })
-    .limit(1)
-    .maybeSingle();
+    .order("last_run_at", { ascending: true, nullsFirst: true });
 
-  // 2. Leads today (grouped by status)
+  // 2. Leads today with niche breakdown
   const { data: leadsToday } = await supabase
     .from("leads")
-    .select("status")
+    .select("status, service_requested")
     .eq("source", "prospecting")
     .gte("created_at", startOfToday);
 
@@ -279,11 +277,30 @@ async function handleProspectingReport(supabase: any, telegramKey: string, chatI
   // Format message
   let msg = `📊 <b>Relatório de Prospecção</b>\n\n`;
 
-  if (activeConfig) {
-    msg += `🎯 <b>Foco atual:</b> ${activeConfig.niche} — ${activeConfig.region || "Belgique"}\n`;
-    msg += `   Alvo diário: ${activeConfig.max_leads_per_run || 40} leads\n\n`;
+  // Active niches block
+  const configs = activeConfigs || [];
+  if (configs.length > 0) {
+    const dailyTarget = configs[0]?.max_leads_per_run || 40;
+    const region = configs[0]?.region || "Belgique";
+    msg += `🎯 <b>Nichos ativos (${configs.length}):</b> ${region}\n`;
+
+    // Next in rotation = first (oldest last_run_at / null)
+    const next = configs[0];
+    const nextLabel = next.last_run_at
+      ? new Date(next.last_run_at).toLocaleDateString("pt-BR", { timeZone: "Europe/Brussels", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : "nunca";
+    msg += `   ⏭ <b>Próximo:</b> ${next.niche} <i>(último: ${nextLabel})</i>\n`;
+
+    // List all niches
+    for (const c of configs) {
+      const when = c.last_run_at
+        ? new Date(c.last_run_at).toLocaleDateString("pt-BR", { timeZone: "Europe/Brussels", day: "2-digit", month: "2-digit" })
+        : "—";
+      msg += `   • ${c.niche} <i>(${when})</i>\n`;
+    }
+    msg += `\n   Alvo por rodada: ${dailyTarget} leads\n\n`;
   } else {
-    msg += `🎯 <b>Foco atual:</b> <i>nenhuma config ativa</i>\n\n`;
+    msg += `🎯 <b>Nichos ativos:</b> <i>nenhuma config ativa</i>\n\n`;
   }
 
   msg += `📅 <b>Hoje:</b> ${totalToday} leads coletados\n`;
