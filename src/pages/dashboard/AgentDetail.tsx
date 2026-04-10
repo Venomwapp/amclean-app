@@ -442,9 +442,17 @@ const LeadRow = ({ lead, meta, onSelect, isStuck, agentName }: { lead: any; meta
   };
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(lead.id)}
-      className="w-full flex items-center justify-between bg-card/30 hover:bg-card/60 rounded-lg px-3 py-2.5 transition-all group"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(lead.id);
+        }
+      }}
+      className="w-full flex items-center justify-between bg-card/30 hover:bg-card/60 rounded-lg px-3 py-2.5 transition-all group cursor-pointer"
     >
       <div className="flex items-center gap-3">
         <div className={`w-8 h-8 rounded-full ${meta.bg}/10 flex items-center justify-center text-xs font-bold ${meta.text}`}>
@@ -478,7 +486,7 @@ const LeadRow = ({ lead, meta, onSelect, isStuck, agentName }: { lead: any; meta
         {lead.score && <Badge className={`text-[9px] border ${SCORE_COLORS[lead.score] || ''}`}>{lead.score}</Badge>}
         <Eye className="w-3.5 h-3.5 text-muted-foreground/30 group-hover:text-muted-foreground/60 transition-colors" />
       </div>
-    </button>
+    </div>
   );
 };
 

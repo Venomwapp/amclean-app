@@ -459,25 +459,32 @@ serve(async (req) => {
     }
 
     if (!lead) {
-      // Normalize number with + prefix for display (e.g. +32493721779)
-      const normalizedNumber = whatsappNumber.startsWith('+') ? whatsappNumber : `+${normalizePhone(whatsappNumber)}`;
-      const { data: newLead, error: insertErr } = await supabaseAdmin
-        .from("leads")
-        .insert({
-          whatsapp_number: normalizedNumber,
-          status: "new",
-          active_agent: "claire",
-          language: "fr",
-          source: "whatsapp",
-        })
-        .select()
-        .single();
-      if (insertErr) throw new Error(`Lead insert error: ${insertErr.message}`);
-      lead = newLead;
-      console.log("[Webhook] New lead created:", lead.id);
-    } else {
-      await supabaseAdmin.from("leads").update({ updated_at: new Date().toISOString() }).eq("id", lead.id);
+      // Não responde quem não foi prospectado — ignora mensagens de desconhecidos
+      console.log("[Webhook] No lead found for", whatsappNumber, "— ignoring (only prospected leads get replies)");
+      return new Response(JSON.stringify({ status: "ignored", reason: "not_prospected" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
+
+    // Só responde leads que foram prospectados
+    if (lead.source !== "prospecting") {
+      console.log("[Webhook] Lead", lead.id, "source is", lead.source, "— ignoring (only 'prospecting' source gets replies)");
+      // Salva a mensagem no histórico mas não responde
+      await supabaseAdmin.from("conversations").insert({
+        lead_id: lead.id,
+        role: "user",
+        content: messageText,
+        agent: lead.active_agent,
+        metadata: { auto_reply: false, reason: "not_prospecting_source" },
+      });
+      return new Response(JSON.stringify({ status: "saved_no_reply", reason: "not_prospecting_source", lead_id: lead.id }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    await supabaseAdmin.from("leads").update({ updated_at: new Date().toISOString() }).eq("id", lead.id);
 
     // Cancel pending followups when lead responds
     await supabaseAdmin
@@ -527,25 +534,73 @@ serve(async (req) => {
       .order("created_at", { ascending: true })
       .limit(20);
 
-    // Build enriched system prompt
-    const npsInfo = lead.nps_data ? `\n- NPS Data: score=${lead.nps_data.last_nps_score ?? "non évalué"}, google_review_proposed=${lead.nps_data.google_review_proposed ?? false}, referral_proposed=${lead.nps_data.referral_proposed ?? false}` : "";
-    
-    // Provide current date/time so agents can propose near-term slots
+    // Build enriched system prompt — respecting lead language
+    const lang = (lead.language || "fr").toLowerCase();
+    const npsInfo = lead.nps_data ? `\n- NPS: score=${lead.nps_data.last_nps_score ?? "N/A"}, google_review=${lead.nps_data.google_review_proposed ?? false}, referral=${lead.nps_data.referral_proposed ?? false}` : "";
+
     const now = new Date();
-    const dayNames = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
-    const monthNames = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-    // Use proper Brussels time (not server UTC)
     const brusselsFmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Brussels", weekday: "long", day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
     const brusselsParts = brusselsFmt.formatToParts(now);
     const bPart = (type: string) => brusselsParts.find(p => p.type === type)?.value || "";
+
+    // Multilingual date context
+    const dayNamesMap: Record<string, string[]> = {
+      fr: ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"],
+      pt: ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"],
+      nl: ["zondag", "maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag"],
+      en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    };
+    const monthNamesMap: Record<string, string[]> = {
+      fr: ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"],
+      pt: ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"],
+      nl: ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober", "november", "december"],
+      en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    };
+    const dayNames = dayNamesMap[lang] || dayNamesMap.fr;
+    const monthNames = monthNamesMap[lang] || monthNamesMap.fr;
     const brusselsDayName = dayNames[new Date(now.toLocaleString("en-US", { timeZone: "Europe/Brussels" })).getDay()];
     const brusselsMonthName = monthNames[new Date(now.toLocaleString("en-US", { timeZone: "Europe/Brussels" })).getMonth()];
-    const dateContext = `\n\nDATE ACTUELLE : ${brusselsDayName} ${bPart("day")} ${brusselsMonthName} ${bPart("year")}, ${bPart("hour")}h${bPart("minute")} (heure de Belgique).`;
-    
-    const leadContext = `\n\nDONNÉES CONNUES SUR CE LEAD :\n- Nom: ${lead.contact_name || "inconnu"}\n- Entreprise: ${lead.company_name || "inconnue"}\n- Service demandé: ${lead.service_requested || "non précisé"}\n- Localisation: ${lead.location || "inconnue"}\n- Adresse: ${lead.address || "non précisée"}\n- Surface: ${lead.surface_area || "non précisée"}\n- Fréquence: ${lead.frequency || "non précisée"}\n- Timeline: ${lead.timeline || "non précisé"}\n- Score: ${lead.score || "non évalué"}\n- Langue détectée: ${lead.language || "fr"}${npsInfo}\n(Ne redemande pas les informations déjà connues.)`;
 
-    const schedulingRules = `\n\nRÈGLES D'AGENDA :\n- Quand le client propose un horaire, UTILISE EXACTEMENT cet horaire dans ta réponse et dans le tag [SCHEDULING_REQUEST].\n- Ne change JAMAIS l'heure proposée par le client (ex: s'il dit "10h", confirme 10h, pas 11h).\n- Si le client dit "demain", c'est le jour suivant la date actuelle.\n- Si le client dit un jour de la semaine (ex: "lundi"), c'est le prochain lundi à venir.\n- Répète toujours la date et l'heure dans ta confirmation pour que le client valide.`;
-    const systemPrompt = agentConfig.system_prompt + dateContext + schedulingRules + leadContext;
+    // Language-specific context templates
+    const langContexts: Record<string, { dateLabel: string; leadLabel: string; unknown: string; notSpecified: string; schedulingRules: string; langInstruction: string }> = {
+      fr: {
+        dateLabel: "DATE ACTUELLE",
+        leadLabel: "DONNÉES CONNUES SUR CE LEAD",
+        unknown: "inconnu", notSpecified: "non précisé",
+        schedulingRules: `RÈGLES D'AGENDA :\n- Quand le client propose un horaire, UTILISE EXACTEMENT cet horaire.\n- Ne change JAMAIS l'heure proposée par le client.\n- Si le client dit "demain", c'est le jour suivant.\n- Répète toujours la date et l'heure dans ta confirmation.`,
+        langInstruction: "Réponds TOUJOURS en français.",
+      },
+      pt: {
+        dateLabel: "DATA ATUAL",
+        leadLabel: "DADOS CONHECIDOS SOBRE ESTE LEAD",
+        unknown: "desconhecido", notSpecified: "não informado",
+        schedulingRules: `REGRAS DE AGENDA:\n- Quando o cliente propor um horário, USE EXATAMENTE esse horário.\n- NUNCA mude o horário proposto pelo cliente.\n- Se o cliente disser "amanhã", é o dia seguinte.\n- Sempre repita a data e o horário na confirmação.`,
+        langInstruction: "Responda SEMPRE em português do Brasil. NUNCA misture com francês ou outro idioma. Use 'você', não 'tu'.",
+      },
+      nl: {
+        dateLabel: "HUIDIGE DATUM",
+        leadLabel: "BEKENDE GEGEVENS OVER DEZE LEAD",
+        unknown: "onbekend", notSpecified: "niet opgegeven",
+        schedulingRules: `AGENDAREGELS:\n- Gebruik EXACT het tijdstip dat de klant voorstelt.\n- Verander NOOIT het voorgestelde tijdstip.\n- Als de klant "morgen" zegt, is dat de volgende dag.\n- Herhaal altijd de datum en tijd in je bevestiging.`,
+        langInstruction: "Antwoord ALTIJD in het Nederlands.",
+      },
+      en: {
+        dateLabel: "CURRENT DATE",
+        leadLabel: "KNOWN DATA ABOUT THIS LEAD",
+        unknown: "unknown", notSpecified: "not specified",
+        schedulingRules: `SCHEDULING RULES:\n- When the client proposes a time, USE EXACTLY that time.\n- NEVER change the time proposed by the client.\n- If the client says "tomorrow", it's the next day.\n- Always repeat the date and time in your confirmation.`,
+        langInstruction: "Always respond in English.",
+      },
+    };
+    const lc = langContexts[lang] || langContexts.fr;
+
+    const dateContext = `\n\n${lc.dateLabel}: ${brusselsDayName} ${bPart("day")} ${brusselsMonthName} ${bPart("year")}, ${bPart("hour")}h${bPart("minute")} (Brussels).`;
+
+    const leadContext = `\n\n${lc.leadLabel}:\n- Nome/Nom: ${lead.contact_name || lc.unknown}\n- Empresa/Entreprise: ${lead.company_name || lc.unknown}\n- Serviço/Service: ${lead.service_requested || lc.notSpecified}\n- Localização/Localisation: ${lead.location || lc.unknown}\n- Endereço/Adresse: ${lead.address || lc.notSpecified}\n- Área/Surface: ${lead.surface_area || lc.notSpecified}\n- Frequência/Fréquence: ${lead.frequency || lc.notSpecified}\n- Timeline: ${lead.timeline || lc.notSpecified}\n- Score: ${lead.score || "N/A"}\n- Língua/Langue: ${lead.language || "fr"}${npsInfo}`;
+
+    const languageForce = `\n\nIMPORTANT — ${lc.langInstruction}`;
+    const schedulingRules = `\n\n${lc.schedulingRules}`;
+    const systemPrompt = agentConfig.system_prompt + languageForce + dateContext + schedulingRules + leadContext;
 
     // Step 5: Call LLM via Gemini API
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");

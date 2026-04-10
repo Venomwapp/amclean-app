@@ -19,13 +19,12 @@ interface ExtractedLead {
 
 // ==================== QUERY GENERATION ====================
 
-// All Belgian regions for rotation
+// Scraping restricted to Brussels-Capital Region only (19 communes)
 const BELGIAN_REGIONS = [
-  'Bruxelles', 'Ixelles', 'Uccle', 'Etterbeek', 'Woluwe-Saint-Lambert', 'Schaerbeek', 'Anderlecht',
-  'Liège', 'Namur', 'Charleroi', 'Mons', 'Tournai', 'La Louvière',
-  'Anvers', 'Gand', 'Bruges', 'Louvain', 'Malines', 'Hasselt',
-  'Waterloo', 'Wavre', 'Nivelles', 'Ottignies', 'Braine-l\'Alleud',
-  'Arlon', 'Bastogne', 'Marche-en-Famenne', 'Dinant', 'Verviers', 'Eupen',
+  'Bruxelles', 'Ixelles', 'Uccle', 'Schaerbeek', 'Anderlecht', 'Etterbeek',
+  'Woluwe-Saint-Lambert', 'Woluwe-Saint-Pierre', 'Saint-Gilles', 'Forest', 'Jette',
+  'Molenbeek-Saint-Jean', 'Saint-Josse-ten-Noode', 'Evere', 'Ganshoren',
+  'Koekelberg', 'Berchem-Sainte-Agathe', 'Auderghem', 'Watermael-Boitsfort',
 ];
 
 const nicheVariants: Record<string, string[]> = {

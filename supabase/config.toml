@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.send-quote-email]
 verify_jwt = false
+
+[functions.lucas-post-visit]
+verify_jwt = false

@@ -20,13 +20,12 @@ const corsHeaders = {
 const DAILY_TARGET = 40;
 const MAX_ROUNDS = 8; // Safety limit to avoid infinite loops
 
+// Scraping restricted to Brussels-Capital Region only (19 communes)
 const REGIONS = [
   'Bruxelles', 'Ixelles', 'Uccle', 'Schaerbeek', 'Anderlecht', 'Etterbeek',
-  'Woluwe-Saint-Lambert', 'Saint-Gilles', 'Forest', 'Jette',
-  'Liège', 'Namur', 'Charleroi', 'Mons', 'Tournai', 'La Louvière',
-  'Anvers', 'Gand', 'Bruges', 'Louvain', 'Malines', 'Hasselt',
-  'Waterloo', 'Wavre', 'Nivelles', 'Ottignies',
-  'Arlon', 'Verviers', 'Dinant', 'Bastogne',
+  'Woluwe-Saint-Lambert', 'Woluwe-Saint-Pierre', 'Saint-Gilles', 'Forest', 'Jette',
+  'Molenbeek-Saint-Jean', 'Saint-Josse-ten-Noode', 'Evere', 'Ganshoren',
+  'Koekelberg', 'Berchem-Sainte-Agathe', 'Auderghem', 'Watermael-Boitsfort',
 ];
 
 Deno.serve(async (req) => {
