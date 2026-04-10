@@ -254,6 +254,54 @@ function extractLeadsFromMarkdown(markdown: string, url: string, niche: string):
   return leads;
 }
 
+// Blacklist of UI/navigation phrases that are NOT company names.
+// Matching is case-insensitive and via substring contains.
+const COMPANY_NAME_BLACKLIST_SUBSTRINGS = [
+  // Contact / CTA phrases
+  'hésitez pas', 'hesitez pas', 'nous contacter', 'nous appeler',
+  'contactez-nous', 'contactez nous', 'contact us', 'contacter le',
+  'informations de contact', 'information de contact',
+  'coordonnées', 'coordonnes',
+  'des questions', 'pour tout problème', 'pour tout probleme',
+  // Directory / navigation UI
+  'haut de page', 'retour en haut', 'retour haut',
+  'intéressé par', 'interesse par',
+  'prospection b2b', 'type d\'entreprises', 'type entreprises',
+  'numéros signalés', 'numeros signales', 'indicatif belgique',
+  'dernière mise à jour', 'derniere mise a jour',
+  'téléphone historique', 'telephone historique',
+  'voir plus', 'lire plus', 'en savoir plus', 'en savoir',
+  'cliquez ici', 'cliquer ici', 'cliquez',
+  'page précédente', 'page suivante', 'page precedente', 'page blanche',
+  'essayez les solutions', 'solutions ci-dessous',
+  'vous pouvez la télécharger', 'télécharger gratuitement',
+  'consultez nos', 'conditions générales', 'conditions generales',
+  'médiation hospitalière', 'mediation hospitaliere',
+  'autres avocats', 'autres médecins', 'autres docteurs',
+  // Image filenames
+  'img_', 'dsc_', 'photo_', '.jpg', '.jpeg', '.png', '.gif', '.webp',
+  // Generic category headers
+  'votre prospection',
+  // Meta / cookies
+  'cookie', 'mentions légales', 'mentions legales', 'politique de confidentialité',
+  // Useless single concepts
+  'numéro gsm', 'numero gsm', 'fixe / mobile',
+  'espace personnel', 'espace membre',
+  'services de soins', 'médecine générale', 'medecine generale',
+  'médecin psychiatre', 'medecin psychiatre',
+  'similaire', 'similar',
+];
+
+// Prefixes that disqualify a name outright
+const COMPANY_NAME_BLACKLIST_PREFIXES = [
+  'tél', 'tel:', 'tel.', 'téléphone', 'telephone', 'fax', 'e-mail', 'email', 'mail:',
+  'adresse:', 'adresse :', 'horaire', 'horaires',
+  'http', 'www.',
+  'enregistrez', 'inscri', 'connexion', 'login', 'sign ', 'accept',
+  'logo of', 'logo ',
+  '♦', '★', '☆', '►', '▶',
+];
+
 // Clean company name: remove URLs, junk text, markdown artifacts
 function cleanCompanyName(raw: string): string {
   let name = raw
@@ -261,14 +309,56 @@ function cleanCompanyName(raw: string): string {
     .replace(/www\.[^\s]+/g, '')           // Remove www.
     .replace(/[#*\[\](){}|]/g, '')         // Remove markdown chars
     .replace(/^\d+\.\s*/, '')              // Remove leading numbers "1. "
-    .replace(/^[-–—•]\s*/, '')             // Remove leading bullets
+    .replace(/^[-–—•♦★☆►▶!>]+\s*/, '')    // Remove leading bullets & symbols
     .replace(/\s+/g, ' ')
     .trim();
 
-  // Skip names that are clearly not business names
+  // Basic length checks
   if (name.length < 3 || name.length > 80) return '';
-  if (/^(http|www\.|enregistrez|inscri|connexion|login|sign|cookie|accept|lire|voir|page|click|logo of)/i.test(name)) return '';
   if (/^\d+$/.test(name)) return '';
+
+  const lower = name.toLowerCase();
+
+  // Reject blacklisted prefixes
+  for (const prefix of COMPANY_NAME_BLACKLIST_PREFIXES) {
+    if (lower.startsWith(prefix)) return '';
+  }
+
+  // Reject blacklisted substrings
+  for (const sub of COMPANY_NAME_BLACKLIST_SUBSTRINGS) {
+    if (lower.includes(sub)) return '';
+  }
+
+  // Reject if ends with ":" or "?" (usually a label / question, not a name)
+  if (/[:?]$/.test(name)) return '';
+
+  // Reject full sentences ending with period (unlikely a company name)
+  if (/\.$/.test(name) && name.split(/\s+/).length >= 5) return '';
+
+  // Reject if looks like a domain anywhere ("xxx.be", "xxx.com", with optional path/number)
+  if (/^[a-z0-9./-]+\.(be|com|fr|nl|eu|net|org)(\s+\d+)?$/i.test(name)) return '';
+  if (/[a-z0-9-]+\.(be|com|fr|nl|eu|net|org)\/[a-z0-9/_-]+/i.test(name)) return '';
+
+  // Reject if starts with a phone number (e.g., "04 337 43 16 -")
+  if (/^\+?\d[\d\s.-]{6,}/.test(name)) return '';
+
+  // Reject Belgian VAT numbers ("BE 0472.937.059")
+  if (/^BE\s*\d/.test(name)) return '';
+
+  // Reject if ≤2 letters total (e.g., "GO !")
+  const letterCount = (name.match(/[a-zA-ZÀ-ÿ]/g) || []).length;
+  if (letterCount < 3) return '';
+
+  // Reject generic category listings like "Boulangeries, Boulangeries- Pâtisseries"
+  // (comma-separated plural nouns without any proper noun feel)
+  if (/^[a-zà-ÿ]+s,\s*[a-zà-ÿ\- ]+s$/i.test(name)) return '';
+
+  // Reject "9 19 avis" / "12 avis" patterns
+  if (/^\d+(\s+\d+)?\s+avis$/i.test(name)) return '';
+
+  // Reject single city names as company (common Belgian cities)
+  const singleCity = /^(bruxelles|brussels|ixelles|schaerbeek|anderlecht|uccle|liège|liege|namur|charleroi|mons|tournai|anvers|antwerpen|gand|gent|bruges|brugge|louvain|leuven|hasselt)$/i;
+  if (singleCity.test(name)) return '';
 
   return name;
 }
