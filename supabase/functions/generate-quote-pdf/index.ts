@@ -23,32 +23,60 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
+    const isSample = body.sample === true;
     const quote_id = body.quote_id;
-    if (!quote_id) throw new Error("quote_id is required");
+    if (!isSample && !quote_id) throw new Error("quote_id is required");
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: quote, error } = await supabase
-      .from("quotes")
-      .select("*, leads(*)")
-      .eq("id", quote_id)
-      .single();
+    let companyName: string;
+    let contactName: string;
+    let items: any[];
+    let total: number;
+    let description: string;
+    let lang: string;
 
-    if (error || !quote) throw new Error("Quote not found: " + (error?.message || "null"));
+    if (isSample) {
+      console.log("[generate-quote-pdf] Sample mode");
+      lang = body.lang === "pt" ? "pt" : "fr";
+      companyName = "Exemple SPRL";
+      contactName = "Marie Dupont";
+      description = lang === "pt"
+        ? "Limpeza de escritórios — prestação regular semanal"
+        : "Nettoyage bureaux — prestation régulière hebdomadaire";
+      items = [
+        { service: lang === "pt" ? "Limpeza geral" : "Nettoyage général", details: lang === "pt" ? "Escritórios e áreas comuns (~200m²)" : "Bureaux et espaces communs (~200m²)", frequency: lang === "pt" ? "2x / semana" : "2x / semaine", price: 650.00 },
+        { service: lang === "pt" ? "Sanitários" : "Sanitaires", details: lang === "pt" ? "Desinfecção completa" : "Désinfection complète", frequency: lang === "pt" ? "2x / semana" : "2x / semaine", price: 280.00 },
+        { service: lang === "pt" ? "Vidros interiores" : "Vitres intérieures", details: lang === "pt" ? "Portas e divisórias" : "Portes et cloisons", frequency: lang === "pt" ? "Mensal" : "Mensuel", price: 180.00 },
+        { service: lang === "pt" ? "Produtos e materiais" : "Produits et matériel", details: lang === "pt" ? "Todos incluídos" : "Tous inclus", frequency: lang === "pt" ? "Incluído" : "Inclus", price: 140.00 },
+      ];
+      total = 1250.00;
+    } else {
+      const { data: quote, error } = await supabase
+        .from("quotes")
+        .select("*, leads(*)")
+        .eq("id", quote_id)
+        .single();
 
-    const lead = quote.leads;
-    const companyName = lead?.company_name || lead?.contact_name || lead?.whatsapp_number || "Cliente";
-    const contactName = lead?.contact_name || lead?.whatsapp_number || "Prezado(a)";
-    const items = (quote.items as any[]) || [];
-    const total = quote.total_amount || 0;
-    const description = quote.description || "";
+      if (error || !quote) throw new Error("Quote not found: " + (error?.message || "null"));
+
+      const lead = quote.leads;
+      companyName = lead?.company_name || lead?.contact_name || lead?.whatsapp_number || "Cliente";
+      contactName = lead?.contact_name || lead?.whatsapp_number || "Prezado(a)";
+      items = (quote.items as any[]) || [];
+      total = quote.total_amount || 0;
+      description = quote.description || "";
+      lang = lead?.language || "fr";
+    }
+
     const today = new Date();
     const dateStr = `${today.getDate().toString().padStart(2, "0")}/${(today.getMonth() + 1).toString().padStart(2, "0")}/${today.getFullYear()}`;
-    const refNum = `PROP-${today.getFullYear()}/${String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")}`;
+    const refNum = isSample
+      ? `EXEMPLE-${today.getFullYear()}/001`
+      : `PROP-${today.getFullYear()}/${String(Math.floor(Math.random() * 999) + 1).padStart(3, "0")}`;
 
-    const lang = lead?.language || "fr";
     const isFr = lang === "fr" || lang === "nl";
     const t = getTexts(isFr, companyName, contactName);
 
@@ -315,11 +343,16 @@ serve(async (req) => {
     console.log("[generate-quote-pdf] PDF generated, size:", pdfBytes.length, "bytes");
 
     // Upload to storage — use company/client name in filename
-    const safeName = (companyName || contactName || "cliente")
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
-      .toLowerCase().slice(0, 50);
-    const fileName = `proposta-${safeName}-${quote_id.slice(0, 8)}.pdf`;
+    let fileName: string;
+    if (isSample) {
+      fileName = `modelo-orcamento-${lang}.pdf`;
+    } else {
+      const safeName = (companyName || contactName || "cliente")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+        .toLowerCase().slice(0, 50);
+      fileName = `proposta-${safeName}-${quote_id.slice(0, 8)}.pdf`;
+    }
     const { error: uploadError } = await supabase.storage
       .from("quote-assets")
       .upload(fileName, pdfBytes, {
@@ -331,10 +364,12 @@ serve(async (req) => {
 
     const publicUrl = `${supabaseUrl}/storage/v1/object/public/quote-assets/${fileName}`;
 
-    await supabase.from("quotes").update({
-      pdf_url: publicUrl,
-      updated_at: new Date().toISOString(),
-    }).eq("id", quote_id);
+    if (!isSample) {
+      await supabase.from("quotes").update({
+        pdf_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      }).eq("id", quote_id);
+    }
 
     console.log("[generate-quote-pdf] Done! URL:", publicUrl);
     return new Response(JSON.stringify({ ok: true, url: publicUrl }), {
