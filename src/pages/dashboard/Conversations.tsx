@@ -32,7 +32,13 @@ const Conversations = () => {
     const { data: convLeadIds } = await supabase.from('conversations').select('lead_id');
     if (!convLeadIds || convLeadIds.length === 0) { setLeads([]); return; }
     const uniqueIds = [...new Set(convLeadIds.map(c => c.lead_id).filter(Boolean))];
-    const { data } = await supabase.from('leads').select('id, contact_name, company_name, whatsapp_number, active_agent, status').in('id', uniqueIds).order('updated_at', { ascending: false });
+    // Only show leads that are real prospects (have a source tag). Existing clients without source stay out.
+    const { data } = await supabase
+      .from('leads')
+      .select('id, contact_name, company_name, whatsapp_number, active_agent, status, source')
+      .in('id', uniqueIds)
+      .not('source', 'is', null)
+      .order('updated_at', { ascending: false });
     if (data) setLeads(data);
   };
 
@@ -150,16 +156,16 @@ const Conversations = () => {
               >
                 <div className="flex items-center gap-2.5">
                   <div className={`w-8 h-8 rounded-full ${agentMeta.bg}/10 flex items-center justify-center text-[11px] font-bold ${agentMeta.text}`}>
-                    {(lead.contact_name || lead.whatsapp_number || '?')[0]?.toUpperCase()}
+                    {(lead.contact_name || lead.company_name || '?')[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-[13px] font-medium text-foreground truncate flex-1">
-                        {lead.contact_name || lead.whatsapp_number || t('dashboard.conversations.anonymous_lead')}
+                        {lead.contact_name || lead.company_name || t('dashboard.conversations.anonymous_lead')}
                       </p>
                       <span className="text-[10px]">{agentMeta.emoji}</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground truncate">{lead.company_name || lead.status || ''}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{lead.whatsapp_number || lead.status || ''}</p>
                   </div>
                 </div>
               </button>
@@ -182,7 +188,7 @@ const Conversations = () => {
                   <MessageSquare className={`w-4 h-4 ${AGENT_META[selectedLead?.active_agent]?.text || 'text-muted-foreground'}`} />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-foreground">{selectedLead?.contact_name || 'Lead'}</p>
+                  <p className="text-sm font-medium text-foreground">{selectedLead?.contact_name || selectedLead?.company_name || selectedLead?.whatsapp_number || t('dashboard.conversations.anonymous_lead')}</p>
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] ${AGENT_META[selectedLead?.active_agent]?.text || 'text-muted-foreground'}`}>
                       {AGENT_META[selectedLead?.active_agent]?.emoji} {selectedLead?.active_agent}
@@ -214,7 +220,9 @@ const Conversations = () => {
                     }`}>
                       <div className="flex items-center gap-2 mb-1">
                         <span className={`text-[10px] font-semibold ${isLead ? 'text-accent' : agentMeta.text}`}>
-                          {isLead ? '👤 Lead' : `${agentMeta.emoji} ${msg.agent}${isManual ? ` (${t('dashboard.conversations.manual')})` : ''}${isFollowup ? ` (${t('dashboard.conversations.followup')})` : ''}`}
+                          {isLead
+                            ? `👤 ${selectedLead?.contact_name || selectedLead?.company_name || selectedLead?.whatsapp_number || t('dashboard.conversations.anonymous_lead')}`
+                            : `${agentMeta.emoji} ${msg.agent}${isManual ? ` (${t('dashboard.conversations.manual')})` : ''}${isFollowup ? ` (${t('dashboard.conversations.followup')})` : ''}`}
                         </span>
                         <span className="text-[10px] text-muted-foreground/50">
                           {new Date(msg.created_at).toLocaleTimeString('fr-BE', { hour: '2-digit', minute: '2-digit' })}
