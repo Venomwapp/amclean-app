@@ -38,12 +38,13 @@ Deno.serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Pick the next niche (oldest last_run_at)
+    // Pick the next niche (oldest last_run_at, with deterministic tie-breaker for NULLs)
     const { data: config, error: configError } = await supabase
       .from('prospecting_configs')
       .select('*')
       .eq('is_active', true)
       .order('last_run_at', { ascending: true, nullsFirst: true })
+      .order('niche', { ascending: true })
       .limit(1)
       .single();
 
@@ -57,6 +58,18 @@ Deno.serve(async (req) => {
 
     const target = config.max_leads_per_run || DAILY_TARGET;
     console.log(`[Sofia Cron] 🎯 Target: ${target} leads | Niche: "${config.niche}" | Last run: ${config.last_run_at || 'never'}`);
+
+    // Mark as picked IMMEDIATELY to ensure rotation progresses even if edge function times out
+    const { error: markError } = await supabase
+      .from('prospecting_configs')
+      .update({ last_run_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq('id', config.id);
+
+    if (markError) {
+      console.error('[Sofia Cron] Failed to update last_run_at:', markError);
+    } else {
+      console.log(`[Sofia Cron] ✓ Marked "${config.niche}" as picked, rotation will advance`);
+    }
 
     // Shuffle regions to avoid always hitting the same ones
     const shuffledRegions = [...REGIONS].sort(() => Math.random() - 0.5);
@@ -110,7 +123,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update last_run_at
+    // Refresh last_run_at with final timestamp (keeps rotation accurate if we completed all rounds)
     await supabase
       .from('prospecting_configs')
       .update({ last_run_at: new Date().toISOString(), updated_at: new Date().toISOString() })
